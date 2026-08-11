@@ -139,6 +139,38 @@ async def test_nav_panel_renders_without_raising_after_connect():
 
 
 @pytest.mark.asyncio
+async def test_center_panel_renders_run_table_statuses_and_details_action():
+    """The primary workspace is a durable run table, not a transient toast."""
+    from imperal_sdk.testing import MockContext, MockSecretStore
+    import panels
+    import storage as st
+
+    ctx = MockContext()
+    ctx.secrets = MockSecretStore({"pagespeed_api_key": "test-key"})
+    completed_id = await st.save_snapshot(ctx, {
+        "url": "https://cleantech.md", "strategy": "desktop",
+        "checked_at": "2026-08-11T17:00:00Z", "status": "completed",
+        "scores": {"performance": 0.90},
+    })
+    await st.save_snapshot(ctx, {
+        "url": "https://cleantech.md", "strategy": "mobile",
+        "checked_at": "2026-08-11T17:01:00Z", "status": "running",
+        "scores": {},
+    })
+
+    node = await panels.psi_panel(ctx)
+    dumped = str(node)
+    assert "Speed check runs" in dumped
+    assert "Date & time" in dumped
+    assert "Desktop" in dumped and "Mobile" in dumped
+    assert "90/100" in dumped
+    assert "Running" in dumped and "Completed" in dumped
+    assert "Details" in dumped
+    assert completed_id in dumped
+    assert "view': 'snapshot'" in dumped
+
+
+@pytest.mark.asyncio
 async def test_nav_panel_keeps_visible_fallback_when_secret_service_fails(monkeypatch):
     """Initial sidebar hydration must never disappear if Vault is temporarily unavailable."""
     from imperal_sdk.testing import MockContext, MockSecretStore

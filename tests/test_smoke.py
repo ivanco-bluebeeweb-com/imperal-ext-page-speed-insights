@@ -152,6 +152,15 @@ async def test_check_site_speed_normalizes_bare_domain_and_extracts_metrics():
     assert lcp.category == "good"  # <= 2500ms good threshold
     assert len(snap.opportunities) == 1
     assert snap.opportunities[0].savings_ms == 640.0
+    assert snap.status == "completed"
+
+    # The UI lifecycle keeps one durable run row: it starts as Running before
+    # the provider call and is updated in place to Completed, never duplicated.
+    saved = await h.list_speed_snapshots(ctx, ListSnapshotsParams())
+    assert saved.status == "success"
+    assert saved.data.total == 1
+    assert saved.data.items[0].id == snap.id
+    assert saved.data.items[0].status == "completed"
 
 
 @pytest.mark.asyncio

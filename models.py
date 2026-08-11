@@ -189,6 +189,7 @@ class SpeedSnapshot(sdl.Entity):
     has_field_data: bool = False
     opportunities: list[Opportunity] = []
     checked_at: str = ""
+    status: str = "completed"           # running | completed | failed
     raw_ref: str = ""                   # ссылка на сырой JSON (для retention)
 
 
@@ -203,6 +204,7 @@ class SnapshotSummary(BaseModel):
     performance_score: float = 0.0
     checked_at: str = ""
     has_field_data: bool = False
+    status: str = "completed"
 
 
 class SnapshotList(sdl.Entity):

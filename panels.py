@@ -256,8 +256,10 @@ async def psi_nav_panel(ctx, **kwargs) -> ui.UINode:
     "psi",
     slot="center",
     title="Page Speed Insights",
-    center_overlay=True,
-    refresh="manual",
+    # The run history is the app's primary workspace, not a temporary modal.
+    # Keeping it in the normal center slot makes it visible beside the sidebar.
+    center_overlay=False,
+    refresh="on_event:page-speed-insights.check_site_speed",
 )
 async def psi_panel(ctx, **kwargs) -> ui.UINode:
     view = str(kwargs.get("view") or "").strip().lower()
@@ -271,8 +273,55 @@ async def psi_panel(ctx, **kwargs) -> ui.UINode:
 
     rows = await st.list_snapshots(ctx, limit=50)
     if not rows:
-        return ui.Empty(message="No checks yet -- run your first one from the left sidebar.")
-    return ui.Stack(direction="v", gap=3, children=[
-        ui.Header(text="Check history", level=2),
-        ui.List(items=[_snapshot_row(s) for s in rows], searchable=True),
-    ])
+        return ui.Stack(direction="v", gap=3, children=[
+            ui.Header(text="Speed check runs", level=2,
+                      subtitle="Run a check from the left sidebar. Every run appears here immediately."),
+            ui.Empty(message="No speed checks yet -- run your first one from the left sidebar."),
+        ])
+
+    def score(row: dict) -> str:
+        performance = (row.get("scores") or {}).get("performance")
+        return f"{round(performance * 100)}/100" if performance is not None else "—"
+
+    def status(row: dict) -> str:
+        raw = str(row.get("status") or "completed").lower()
+        return {"running": "Running", "completed": "Completed", "failed": "Failed"}.get(raw, raw.title())
+
+    table_rows = [{
+        "url": row.get("url", "(no URL)"),
+        "checked_at": row.get("checked_at", ""),
+        "device": str(row.get("strategy") or "").title(),
+        "score": score(row),
+        "status": status(row),
+        "details": "Details" if row.get("status", "completed") == "completed" else "—",
+        "snapshot_id": row.get("id", ""),
+    } for row in rows]
+
+    detail_actions = [
+        ui.Button(
+            f"Details — {row['url']}", icon="ChartNoAxesCombined", variant="secondary", size="sm",
+            on_click=ui.Call("__panel__psi", view="snapshot", snapshot_id=row["snapshot_id"]),
+        )
+        for row in table_rows if row["status"] == "Completed" and row["snapshot_id"]
+    ]
+    children: list[ui.UINode] = [
+        ui.Header(text="Speed check runs", level=2,
+                  subtitle="Every check is tracked here from Running to Completed."),
+        ui.DataTable(
+            columns=[
+                ui.DataColumn("url", "Site", width="30%"),
+                ui.DataColumn("checked_at", "Date & time", width="22%"),
+                ui.DataColumn("device", "Device", width="12%"),
+                ui.DataColumn("score", "Performance", width="12%"),
+                ui.DataColumn("status", "Status", width="12%"),
+                ui.DataColumn("details", "Details", sortable=False, width="12%"),
+            ],
+            rows=table_rows,
+        ),
+    ]
+    if detail_actions:
+        children.extend([
+            ui.Header(text="Open a completed analysis", level=3),
+            ui.Stack(direction="h", gap=2, wrap=True, children=detail_actions),
+        ])
+    return ui.Stack(direction="v", gap=3, children=children)

@@ -15,7 +15,10 @@ import codes as c
 import psi_client as psi
 import storage as st
 from app import chat
-from core import build_settings_state, doc_to_snapshot, normalize_url, run_and_save
+from core import (
+    begin_speed_run, build_settings_state, complete_speed_run, doc_to_snapshot,
+    normalize_url, run_and_save,
+)
 from models import (
     CheckSiteSpeedParams, CompareSnapshotsParams, ComparisonResult,
     ConnectPagespeedParams, GetScheduleParams, GetSnapshotParams,
@@ -90,30 +93,54 @@ async def disconnect_pagespeed(ctx, params: NoParams) -> ActionResult:
 @chat.function(
     "check_site_speed",
     description=(
-        "Run a real Google PageSpeed Insights check for one URL: Core Web "
-        "Vitals (LCP, CLS, INP) from real-user field data (if available) plus "
-        "Lighthouse lab scores and top fix opportunities. Saves a timestamped "
-        "snapshot for history/comparison."
+        "Run a real Google PageSpeed Insights check for one URL. The run appears "
+        "in the central history immediately as Running, then becomes Completed or "
+        "Failed with its scores and fix opportunities."
     ),
     action_type="write",
     chain_callable=True,
-    effects=["speed_snapshot.create"],
+    background=True,
+    long_running=True,
+    effects=["speed_snapshot.create", "speed_snapshot.update"],
     event="page-speed-insights.check_site_speed",
     data_model=SpeedSnapshot,
 )
 async def check_site_speed(ctx, params: CheckSiteSpeedParams) -> ActionResult:
-    """Run one real Google PageSpeed Insights check and persist it as a
-    history snapshot. Raises no exception outward -- provider errors become
-    a structured ActionResult.error via psi.ProviderError.code/.retryable."""
+    """Create a visible run immediately, then complete it in the background."""
     try:
-        doc = await run_and_save(ctx, params.url, params.strategy, params.categories)
+        run = await begin_speed_run(ctx, params.url, params.strategy, params.categories)
     except psi.ProviderError as exc:
         return _error(str(exc), exc.code, exc.retryable)
-    perf = doc["scores"].get("performance")
-    perf_txt = f"{round(perf * 100)}/100" if perf is not None else "n/a"
+
+    async def work() -> ActionResult:
+        try:
+            doc = await complete_speed_run(ctx, run)
+        except psi.ProviderError as exc:
+            return _error(str(exc), exc.code, exc.retryable)
+        except Exception:
+            # complete_speed_run has already marked the durable row Failed.
+            # Background tasks must still return a structured result to the host.
+            return _error("The PageSpeed check could not finish.", c.PSI_PROVIDER_ERROR, True)
+        perf = doc["scores"].get("performance")
+        perf_txt = f"{round(perf * 100)}/100" if perf is not None else "n/a"
+        return ActionResult.success(
+            data=doc_to_snapshot(doc),
+            summary=(f"Check completed for {doc['url']} ({doc['strategy']}): "
+                     f"Performance {perf_txt}."),
+            refresh_panels=["psi_nav", "psi"],
+        )
+
+    coro = work()
+    try:
+        await ctx.background_task(coro, long_running=True, name="pagespeed-check")
+    except (RuntimeError, AttributeError):
+        # Tests and local/dev callers do not have the kernel spawn hook.
+        return await coro
+
     return ActionResult.success(
-        data=doc_to_snapshot(doc),
-        summary=f"Check for {doc['url']} ({doc['strategy']}) is ready: Performance {perf_txt}.",
+        data=doc_to_snapshot(run),
+        summary=(f"Check started for {run['url']} ({run['strategy']}). "
+                 "It is now visible in the run history."),
         refresh_panels=["psi_nav", "psi"],
     )
 
@@ -136,6 +163,7 @@ async def list_speed_snapshots(ctx, params: ListSnapshotsParams) -> ActionResult
             performance_score=(r.get("scores") or {}).get("performance", 0.0),
             checked_at=r.get("checked_at", ""),
             has_field_data=bool(r.get("has_field_data")),
+            status=str(r.get("status") or "completed"),
         )
         for r in rows
     ]

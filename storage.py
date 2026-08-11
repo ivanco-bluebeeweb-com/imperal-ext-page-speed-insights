@@ -31,8 +31,21 @@ def now_iso() -> str:
 
 
 async def save_snapshot(ctx, doc: dict) -> str:
+    """Create one completed snapshot (used by scheduled/IPC callers)."""
     entity = await ctx.store.create(SNAPSHOTS_COLLECTION, doc)
     return entity.id
+
+
+async def create_run(ctx, doc: dict) -> str:
+    """Create a visible run before PageSpeed returns, with status=running."""
+    entity = await ctx.store.create(SNAPSHOTS_COLLECTION, doc)
+    return entity.id
+
+
+async def update_run(ctx, run_id: str, patch: dict) -> dict:
+    """Update the one existing run record in place as it completes or fails."""
+    entity = await ctx.store.update(SNAPSHOTS_COLLECTION, run_id, patch)
+    return entity.data | {"id": entity.id}
 
 
 async def list_snapshots(ctx, *, url: str = "", strategy: str = "", limit: int = 20) -> list[dict]:

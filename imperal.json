@@ -416,11 +416,12 @@
     },
     {
       "name": "check_site_speed",
-      "description": "Run a real Google PageSpeed Insights check for one URL: Core Web Vitals (LCP, CLS, INP) from real-user field data (if available) plus Lighthouse lab scores and top fix opportunities. Saves a timestamped snapshot for history/comparison.",
+      "description": "Run a real Google PageSpeed Insights check for one URL. The run appears in the central history immediately as Running, then becomes Completed or Failed with its scores and fix opportunities.",
       "action_type": "write",
       "chain_callable": true,
       "effects": [
-        "speed_snapshot.create"
+        "speed_snapshot.create",
+        "speed_snapshot.update"
       ],
       "id_projection": "",
       "params_schema": {
@@ -566,16 +567,9 @@
             "title": "Description"
           },
           "status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Status"
+            "default": "completed",
+            "title": "Status",
+            "type": "string"
           },
           "url": {
             "default": "",
@@ -652,8 +646,8 @@
         "x-sdl": "entity"
       },
       "event": "page-speed-insights.check_site_speed",
-      "background": false,
-      "long_running": false,
+      "background": true,
+      "long_running": true,
       "scopes": [],
       "owner_chat_tool": "page-speed-insights"
     },
@@ -724,6 +718,11 @@
                 "default": false,
                 "title": "Has Field Data",
                 "type": "boolean"
+              },
+              "status": {
+                "default": "completed",
+                "title": "Status",
+                "type": "string"
               }
             },
             "title": "SnapshotSummary",
@@ -962,16 +961,9 @@
             "title": "Description"
           },
           "status": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "default": null,
-            "title": "Status"
+            "default": "completed",
+            "title": "Status",
+            "type": "string"
           },
           "url": {
             "default": "",
@@ -2522,8 +2514,8 @@
       "title": "Page Speed Insights",
       "tree": {},
       "icon": "",
-      "refresh": "manual",
-      "center_overlay": true
+      "refresh": "on_event:page-speed-insights.check_site_speed",
+      "center_overlay": false
     }
   ]
 }
