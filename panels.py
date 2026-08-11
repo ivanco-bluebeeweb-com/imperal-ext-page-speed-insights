@@ -186,10 +186,15 @@ async def psi_nav_panel(ctx, **kwargs) -> ui.UINode:
                     ],
                 ),
             ),
-            ui.Alert(
-                title="Check history could not load",
-                message="The saved-check history is temporarily unavailable. You can still run a new check.",
-                type="error",
+            ui.Section(
+                title="Run history",
+                children=[
+                    ui.Text("Open the central workspace to see saved runs and their status.", variant="caption"),
+                    ui.Button(
+                        "Open run history", icon="TableProperties", variant="secondary", size="sm",
+                        on_click=ui.Call("__panel__psi"),
+                    ),
+                ],
             ),
         ])
 

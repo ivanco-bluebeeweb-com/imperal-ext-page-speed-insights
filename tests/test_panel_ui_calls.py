@@ -227,7 +227,9 @@ async def test_nav_panel_keeps_visible_fallback_when_history_store_fails(monkeyp
     dumped = str(node)
     assert "Page Speed Insights" in dumped
     assert "Check site speed" in dumped
-    assert "Check history could not load" in dumped
+    assert "Run history" in dumped
+    assert "Open run history" in dumped
+    assert "Check history could not load" not in dumped
 
 
 @pytest.mark.asyncio

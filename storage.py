@@ -49,13 +49,21 @@ async def update_run(ctx, run_id: str, patch: dict) -> dict:
 
 
 async def list_snapshots(ctx, *, url: str = "", strategy: str = "", limit: int = 20) -> list[dict]:
-    page = await ctx.store.query(SNAPSHOTS_COLLECTION, order_by="-checked_at", limit=200)
+    """Return runs newest first, without relying on server-side ordering.
+
+    PageSpeed checks can be written successfully while a server-side
+    ``order_by`` query is rejected by the store. Fetching the collection and
+    sorting the bounded result locally keeps the history readable in that
+    situation instead of turning a successful check into a blank UI.
+    """
+    page = await ctx.store.query(SNAPSHOTS_COLLECTION, limit=200)
     rows = [doc.data | {"id": doc.id} for doc in page.data]
     if url:
         norm = url.lower().strip()
         rows = [r for r in rows if norm in (r.get("url") or "").lower()]
     if strategy:
         rows = [r for r in rows if r.get("strategy") == strategy]
+    rows.sort(key=lambda row: row.get("checked_at") or "", reverse=True)
     return rows[:limit]
 
 

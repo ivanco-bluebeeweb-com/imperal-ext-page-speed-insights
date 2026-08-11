@@ -94,6 +94,31 @@ async def _connected_ctx() -> MockContext:
     return ctx
 
 
+@pytest.mark.asyncio
+async def test_list_snapshots_sorts_locally_without_server_order_by(monkeypatch):
+    """History remains available when the store does not support order_by."""
+    import storage as st
+
+    ctx = _ctx()
+    await st.save_snapshot(ctx, {"url": "https://older.example", "checked_at": "2026-08-11T10:00:00Z"})
+    await st.save_snapshot(ctx, {"url": "https://newer.example", "checked_at": "2026-08-11T11:00:00Z"})
+
+    original_query = ctx.store.query
+    calls: list[dict] = []
+
+    async def query_without_order_by(collection, where=None, order_by=None, limit=100, cursor=None):
+        calls.append({"order_by": order_by, "limit": limit})
+        if order_by:
+            raise RuntimeError("store does not support ordered queries")
+        return await original_query(collection, where=where, limit=limit)
+
+    monkeypatch.setattr(ctx.store, "query", query_without_order_by)
+    rows = await st.list_snapshots(ctx)
+
+    assert [row["url"] for row in rows] == ["https://newer.example", "https://older.example"]
+    assert calls and calls[0]["order_by"] is None
+
+
 # ─────────────────────────── connect / disconnect ───────────────────────────
 
 @pytest.mark.asyncio
