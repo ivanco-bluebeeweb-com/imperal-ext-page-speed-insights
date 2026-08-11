@@ -117,13 +117,25 @@ async def test_nav_panel_renders_without_raising_after_connect():
 
     import panels
 
+    import storage as st
+
     ctx = MockContext()
     ctx.secrets = MockSecretStore({"pagespeed_api_key": "fake-key-for-test"})
+    snapshot_id = await st.save_snapshot(ctx, {
+        "url": "https://example.com",
+        "strategy": "mobile",
+        "checked_at": "2026-08-11T16:30:00Z",
+        "scores": {"performance": 0.82},
+    })
 
     node = await panels.psi_nav_panel(ctx)
     assert node is not None
     dumped = str(node)
     assert "check_site_speed" in dumped
+    assert "View latest analysis" in dumped
+    assert "View details" in dumped
+    assert snapshot_id in dumped
+    assert dumped.count("view': 'snapshot'") >= 2  # latest shortcut + per-result button
 
 
 @pytest.mark.asyncio

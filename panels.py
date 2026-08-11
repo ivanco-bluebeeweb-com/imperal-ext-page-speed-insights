@@ -90,6 +90,26 @@ def _snapshot_row(s: dict) -> ui.ListItem:
     )
 
 
+def _snapshot_card(s: dict) -> ui.UINode:
+    """A history entry with an explicit, always-visible details action."""
+    perf = (s.get("scores") or {}).get("performance")
+    subtitle = s.get("strategy", "")
+    if perf is not None:
+        subtitle = f"{subtitle} · Performance {_score_pct(perf)}"
+    return ui.Card(
+        title=s.get("url", "(no URL)"),
+        subtitle=f"{subtitle} · {s.get('checked_at', '')}",
+        content=ui.Text(
+            "Field data available" if s.get("has_field_data") else "Lab data only",
+            variant="caption",
+        ),
+        footer=ui.Button(
+            "View details", icon="ChartNoAxesCombined", variant="primary", size="sm",
+            on_click=ui.Call("__panel__psi", view="snapshot", snapshot_id=s.get("id", "")),
+        ),
+    )
+
+
 # ── Левый сайдбар: список снимков + ОДНА кнопка App settings ──────────────
 
 @ext.panel(
@@ -173,15 +193,27 @@ async def psi_nav_panel(ctx, **kwargs) -> ui.UINode:
             ),
         ])
 
+    latest_snapshot = rows[0] if rows else None
+    connected_actions: list[ui.UINode] = [
+        ui.Button(
+            "App settings", icon="Settings", variant="secondary", size="sm",
+            on_click=ui.Call("__panel__psi", view="settings"),
+        ),
+    ]
+    if latest_snapshot and latest_snapshot.get("id"):
+        connected_actions.insert(0, ui.Button(
+            "View latest analysis", icon="ChartNoAxesCombined", variant="primary", size="sm",
+            on_click=ui.Call(
+                "__panel__psi", view="snapshot", snapshot_id=latest_snapshot["id"],
+            ),
+        ))
+
     connected_card = ui.Card(
         title="Page Speed Insights",
         subtitle="Connected",
         content=ui.Stack(direction="v", gap=2, children=[
             ui.Text("Google key saved and verified.", variant="caption"),
-            ui.Button(
-                "App settings", icon="Settings", variant="secondary", size="sm",
-                on_click=ui.Call("__panel__psi", view="settings"),
-            ),
+            *connected_actions,
         ]),
     )
 
@@ -201,11 +233,13 @@ async def psi_nav_panel(ctx, **kwargs) -> ui.UINode:
         ),
     )
 
-    items = [_snapshot_row(s) for s in rows]
+    snapshot_cards = [_snapshot_card(s) for s in rows]
     list_section = ui.Section(
-        title=f"Check history ({len(items)})",
-        children=[ui.List(items=items, searchable=True) if items
-                  else ui.Text("No checks yet.", variant="caption")],
+        title=f"Check history ({len(snapshot_cards)})",
+        children=[
+            ui.Stack(direction="v", gap=2, children=snapshot_cards)
+            if snapshot_cards else ui.Text("No checks yet.", variant="caption")
+        ],
     )
 
     return ui.Stack(direction="v", gap=3, children=[
