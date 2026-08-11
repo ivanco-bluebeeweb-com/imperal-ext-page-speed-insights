@@ -1,0 +1,2529 @@
+{
+  "manifest_schema_version": 3,
+  "sdk_version": "5.9.13",
+  "app_id": "page-speed-insights",
+  "version": "0.1.0",
+  "name": "Page Speed Insights",
+  "description": "Real Core Web Vitals (LCP, CLS, INP) and Lighthouse scores for any site, via Google's official PageSpeed Insights API -- using your own free Google API key. Tracks history over time, flags regressions against Google's own official thresholds, and exposes an inter-extension check other apps (like SEO Audit Engine) can call automatically as part of a technical SEO pipeline.",
+  "icon": "icon.svg",
+  "actions_explicit": true,
+  "system": false,
+  "capabilities": [
+    "pagespeed:read",
+    "pagespeed:write"
+  ],
+  "tools": [
+    {
+      "name": "connect_pagespeed",
+      "description": "Connect Page Speed Insights by saving your Google API key, after checking it actually works. Get a free key at console.cloud.google.com -> APIs & Services -> enable 'PageSpeed Insights API' -> Credentials -> Create API key.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "secret.write"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "api_key": {
+            "description": "Google PageSpeed Insights API key для проверки и сохранения",
+            "title": "Api Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "api_key"
+        ],
+        "title": "ConnectPagespeedParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "ScheduleState": {
+            "description": "Вложенный value-object внутри SettingsState -- обычная BaseModel, не\nsdl.Entity: у sdl.Entity id/title обязательны при КАЖДОМ создании\nэкземпляра (подтверждено чтением исходника imperal_sdk.sdl.Entity), а\nэто не имеет смысла для настроечного under-объекта без собственной\nидентичности в списках/панелях.",
+            "properties": {
+              "enabled": {
+                "default": false,
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "hour": {
+                "default": 3,
+                "title": "Hour",
+                "type": "integer"
+              },
+              "sites": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Sites",
+                "type": "array"
+              },
+              "last_run_date": {
+                "default": "",
+                "title": "Last Run Date",
+                "type": "string"
+              }
+            },
+            "title": "ScheduleState",
+            "type": "object"
+          },
+          "ThresholdsState": {
+            "properties": {
+              "lcp_good_ms": {
+                "default": 2500,
+                "title": "Lcp Good Ms",
+                "type": "integer"
+              },
+              "lcp_poor_ms": {
+                "default": 4000,
+                "title": "Lcp Poor Ms",
+                "type": "integer"
+              },
+              "cls_good": {
+                "default": 0.1,
+                "title": "Cls Good",
+                "type": "number"
+              },
+              "cls_poor": {
+                "default": 0.25,
+                "title": "Cls Poor",
+                "type": "number"
+              },
+              "inp_good_ms": {
+                "default": 200,
+                "title": "Inp Good Ms",
+                "type": "integer"
+              },
+              "inp_poor_ms": {
+                "default": 500,
+                "title": "Inp Poor Ms",
+                "type": "integer"
+              }
+            },
+            "title": "ThresholdsState",
+            "type": "object"
+          }
+        },
+        "description": "Всё настраиваемое приложения -- одна сущность для одного экрана\nApp settings (UI_INTERFACE_STANDARD.md, правило 3: всё в одном месте).\n\nЭТО единственный sdl.Entity во всей группе настроек -- id/title\nпередаются явно в handler-е (get_speed_settings), а не как\nclass-level default, потому что общий мутируемый default-инстанс на\nуровне класса это ещё и классическая pydantic/python ловушка общего\nизменяемого состояния между вызовами.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "key_connected": {
+            "default": false,
+            "title": "Key Connected",
+            "type": "boolean"
+          },
+          "thresholds": {
+            "$ref": "#/$defs/ThresholdsState"
+          },
+          "default_categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Default Categories",
+            "type": "array"
+          },
+          "retention_days": {
+            "default": 30,
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "notify_mode": {
+            "default": "regressions",
+            "title": "Notify Mode",
+            "type": "string"
+          },
+          "schedule": {
+            "$ref": "#/$defs/ScheduleState"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "SettingsState",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "page-speed-insights.connect",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "page-speed-insights"
+    },
+    {
+      "name": "disconnect_pagespeed",
+      "description": "Disconnect Page Speed Insights: deletes the saved API key. Existing snapshots stay.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "secret.delete"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {},
+        "title": "NoParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "ScheduleState": {
+            "description": "Вложенный value-object внутри SettingsState -- обычная BaseModel, не\nsdl.Entity: у sdl.Entity id/title обязательны при КАЖДОМ создании\nэкземпляра (подтверждено чтением исходника imperal_sdk.sdl.Entity), а\nэто не имеет смысла для настроечного under-объекта без собственной\nидентичности в списках/панелях.",
+            "properties": {
+              "enabled": {
+                "default": false,
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "hour": {
+                "default": 3,
+                "title": "Hour",
+                "type": "integer"
+              },
+              "sites": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Sites",
+                "type": "array"
+              },
+              "last_run_date": {
+                "default": "",
+                "title": "Last Run Date",
+                "type": "string"
+              }
+            },
+            "title": "ScheduleState",
+            "type": "object"
+          },
+          "ThresholdsState": {
+            "properties": {
+              "lcp_good_ms": {
+                "default": 2500,
+                "title": "Lcp Good Ms",
+                "type": "integer"
+              },
+              "lcp_poor_ms": {
+                "default": 4000,
+                "title": "Lcp Poor Ms",
+                "type": "integer"
+              },
+              "cls_good": {
+                "default": 0.1,
+                "title": "Cls Good",
+                "type": "number"
+              },
+              "cls_poor": {
+                "default": 0.25,
+                "title": "Cls Poor",
+                "type": "number"
+              },
+              "inp_good_ms": {
+                "default": 200,
+                "title": "Inp Good Ms",
+                "type": "integer"
+              },
+              "inp_poor_ms": {
+                "default": 500,
+                "title": "Inp Poor Ms",
+                "type": "integer"
+              }
+            },
+            "title": "ThresholdsState",
+            "type": "object"
+          }
+        },
+        "description": "Всё настраиваемое приложения -- одна сущность для одного экрана\nApp settings (UI_INTERFACE_STANDARD.md, правило 3: всё в одном месте).\n\nЭТО единственный sdl.Entity во всей группе настроек -- id/title\nпередаются явно в handler-е (get_speed_settings), а не как\nclass-level default, потому что общий мутируемый default-инстанс на\nуровне класса это ещё и классическая pydantic/python ловушка общего\nизменяемого состояния между вызовами.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "key_connected": {
+            "default": false,
+            "title": "Key Connected",
+            "type": "boolean"
+          },
+          "thresholds": {
+            "$ref": "#/$defs/ThresholdsState"
+          },
+          "default_categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Default Categories",
+            "type": "array"
+          },
+          "retention_days": {
+            "default": 30,
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "notify_mode": {
+            "default": "regressions",
+            "title": "Notify Mode",
+            "type": "string"
+          },
+          "schedule": {
+            "$ref": "#/$defs/ScheduleState"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "SettingsState",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "page-speed-insights.disconnect",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "page-speed-insights"
+    },
+    {
+      "name": "check_site_speed",
+      "description": "Run a real Google PageSpeed Insights check for one URL: Core Web Vitals (LCP, CLS, INP) from real-user field data (if available) plus Lighthouse lab scores and top fix opportunities. Saves a timestamped snapshot for history/comparison.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "speed_snapshot.create"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "description": "Что и как проверять.",
+        "properties": {
+          "url": {
+            "description": "Полный URL или домен страницы для проверки",
+            "title": "Url",
+            "type": "string"
+          },
+          "strategy": {
+            "default": "mobile",
+            "description": "Стратегия анализа: mobile или desktop. Пусто -> mobile.",
+            "title": "Strategy",
+            "type": "string"
+          },
+          "categories": {
+            "description": "Категории Lighthouse: performance, accessibility, best-practices, seo, pwa",
+            "items": {
+              "type": "string"
+            },
+            "title": "Categories",
+            "type": "array"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "CheckSiteSpeedParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "MetricValue": {
+            "description": "Одна метрика с числом, категорией (good/needs-improvement/poor) и\nисточником. Обычная BaseModel, не sdl.Entity: живёт только вложенной в\nсписок внутри SpeedSnapshot, у неё нет собственной идентичности в UI --\nтот же принцип, что list[dict] у AuditComparison.fixed/appeared/remains\nв SEO Audit Engine.",
+            "properties": {
+              "name": {
+                "default": "",
+                "title": "Name",
+                "type": "string"
+              },
+              "value": {
+                "default": 0.0,
+                "title": "Value",
+                "type": "number"
+              },
+              "unit": {
+                "default": "",
+                "title": "Unit",
+                "type": "string"
+              },
+              "category": {
+                "default": "",
+                "title": "Category",
+                "type": "string"
+              },
+              "source": {
+                "default": "",
+                "title": "Source",
+                "type": "string"
+              }
+            },
+            "title": "MetricValue",
+            "type": "object"
+          },
+          "Opportunity": {
+            "description": "Одна рекомендация Lighthouse с потенциальной экономией времени.\nТоже обычная BaseModel -- вложенный элемент списка, не отдельная SDL-\nсущность (см. пояснение у MetricValue).",
+            "properties": {
+              "id": {
+                "default": "",
+                "title": "Id",
+                "type": "string"
+              },
+              "title": {
+                "default": "",
+                "title": "Title",
+                "type": "string"
+              },
+              "description": {
+                "default": "",
+                "title": "Description",
+                "type": "string"
+              },
+              "savings_ms": {
+                "default": 0.0,
+                "title": "Savings Ms",
+                "type": "number"
+              },
+              "score": {
+                "default": 1.0,
+                "title": "Score",
+                "type": "number"
+              }
+            },
+            "title": "Opportunity",
+            "type": "object"
+          }
+        },
+        "description": "Один снимок проверки: скоры, метрики, opportunities, timestamp.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "default": "",
+            "title": "Url",
+            "type": "string"
+          },
+          "strategy": {
+            "default": "",
+            "title": "Strategy",
+            "type": "string"
+          },
+          "categories": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "scores": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "default": {},
+            "title": "Scores",
+            "type": "object"
+          },
+          "field_metrics": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/MetricValue"
+            },
+            "title": "Field Metrics",
+            "type": "array"
+          },
+          "lab_metrics": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/MetricValue"
+            },
+            "title": "Lab Metrics",
+            "type": "array"
+          },
+          "has_field_data": {
+            "default": false,
+            "title": "Has Field Data",
+            "type": "boolean"
+          },
+          "opportunities": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/Opportunity"
+            },
+            "title": "Opportunities",
+            "type": "array"
+          },
+          "checked_at": {
+            "default": "",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "raw_ref": {
+            "default": "",
+            "title": "Raw Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "SpeedSnapshot",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "page-speed-insights.check",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "page-speed-insights"
+    },
+    {
+      "name": "list_speed_snapshots",
+      "description": "List past Page Speed Insights snapshots, optionally filtered by url/strategy.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "url": {
+            "default": "",
+            "description": "Фильтр по URL/домену. Пусто -- все",
+            "title": "Url",
+            "type": "string"
+          },
+          "strategy": {
+            "default": "",
+            "description": "Фильтр по стратегии. Пусто -- все",
+            "title": "Strategy",
+            "type": "string"
+          },
+          "limit": {
+            "default": 20,
+            "description": "Сколько снимков вернуть",
+            "maximum": 100,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "title": "ListSnapshotsParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "SnapshotSummary": {
+            "description": "Краткая карточка снимка для списков -- без полного тела метрик.\nОбычная BaseModel: живёт вложенной в SnapshotList.items, сам список\n(SnapshotList) -- вот та сущность, что несёт SDL id/title.",
+            "properties": {
+              "id": {
+                "default": "",
+                "title": "Id",
+                "type": "string"
+              },
+              "url": {
+                "default": "",
+                "title": "Url",
+                "type": "string"
+              },
+              "strategy": {
+                "default": "",
+                "title": "Strategy",
+                "type": "string"
+              },
+              "performance_score": {
+                "default": 0.0,
+                "title": "Performance Score",
+                "type": "number"
+              },
+              "checked_at": {
+                "default": "",
+                "title": "Checked At",
+                "type": "string"
+              },
+              "has_field_data": {
+                "default": false,
+                "title": "Has Field Data",
+                "type": "boolean"
+              }
+            },
+            "title": "SnapshotSummary",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "items": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/SnapshotSummary"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "default": 0,
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "SnapshotList",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "page-speed-insights"
+    },
+    {
+      "name": "get_speed_snapshot",
+      "description": "Read one Page Speed Insights snapshot in full -- all metrics and opportunities.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "snapshot_id": {
+            "description": "ID снимка из list_speed_snapshots",
+            "title": "Snapshot Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "snapshot_id"
+        ],
+        "title": "GetSnapshotParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "MetricValue": {
+            "description": "Одна метрика с числом, категорией (good/needs-improvement/poor) и\nисточником. Обычная BaseModel, не sdl.Entity: живёт только вложенной в\nсписок внутри SpeedSnapshot, у неё нет собственной идентичности в UI --\nтот же принцип, что list[dict] у AuditComparison.fixed/appeared/remains\nв SEO Audit Engine.",
+            "properties": {
+              "name": {
+                "default": "",
+                "title": "Name",
+                "type": "string"
+              },
+              "value": {
+                "default": 0.0,
+                "title": "Value",
+                "type": "number"
+              },
+              "unit": {
+                "default": "",
+                "title": "Unit",
+                "type": "string"
+              },
+              "category": {
+                "default": "",
+                "title": "Category",
+                "type": "string"
+              },
+              "source": {
+                "default": "",
+                "title": "Source",
+                "type": "string"
+              }
+            },
+            "title": "MetricValue",
+            "type": "object"
+          },
+          "Opportunity": {
+            "description": "Одна рекомендация Lighthouse с потенциальной экономией времени.\nТоже обычная BaseModel -- вложенный элемент списка, не отдельная SDL-\nсущность (см. пояснение у MetricValue).",
+            "properties": {
+              "id": {
+                "default": "",
+                "title": "Id",
+                "type": "string"
+              },
+              "title": {
+                "default": "",
+                "title": "Title",
+                "type": "string"
+              },
+              "description": {
+                "default": "",
+                "title": "Description",
+                "type": "string"
+              },
+              "savings_ms": {
+                "default": 0.0,
+                "title": "Savings Ms",
+                "type": "number"
+              },
+              "score": {
+                "default": 1.0,
+                "title": "Score",
+                "type": "number"
+              }
+            },
+            "title": "Opportunity",
+            "type": "object"
+          }
+        },
+        "description": "Один снимок проверки: скоры, метрики, opportunities, timestamp.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "default": "",
+            "title": "Url",
+            "type": "string"
+          },
+          "strategy": {
+            "default": "",
+            "title": "Strategy",
+            "type": "string"
+          },
+          "categories": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "scores": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "default": {},
+            "title": "Scores",
+            "type": "object"
+          },
+          "field_metrics": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/MetricValue"
+            },
+            "title": "Field Metrics",
+            "type": "array"
+          },
+          "lab_metrics": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/MetricValue"
+            },
+            "title": "Lab Metrics",
+            "type": "array"
+          },
+          "has_field_data": {
+            "default": false,
+            "title": "Has Field Data",
+            "type": "boolean"
+          },
+          "opportunities": {
+            "default": [],
+            "items": {
+              "$ref": "#/$defs/Opportunity"
+            },
+            "title": "Opportunities",
+            "type": "array"
+          },
+          "checked_at": {
+            "default": "",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "raw_ref": {
+            "default": "",
+            "title": "Raw Ref",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "SpeedSnapshot",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "page-speed-insights"
+    },
+    {
+      "name": "compare_speed_snapshots",
+      "description": "Compare the two most recent Page Speed Insights snapshots for one url+strategy -- what improved, what regressed.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "url": {
+            "description": "URL/домен, для которого сравнить два прогона",
+            "title": "Url",
+            "type": "string"
+          },
+          "strategy": {
+            "default": "mobile",
+            "description": "Стратегия анализа: mobile или desktop",
+            "title": "Strategy",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url"
+        ],
+        "title": "CompareSnapshotsParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "description": "Разница между двумя последними снимками одного url+strategy.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "default": "",
+            "title": "Url",
+            "type": "string"
+          },
+          "strategy": {
+            "default": "",
+            "title": "Strategy",
+            "type": "string"
+          },
+          "previous_checked_at": {
+            "default": "",
+            "title": "Previous Checked At",
+            "type": "string"
+          },
+          "current_checked_at": {
+            "default": "",
+            "title": "Current Checked At",
+            "type": "string"
+          },
+          "score_deltas": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "default": {},
+            "title": "Score Deltas",
+            "type": "object"
+          },
+          "metric_deltas": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "default": {},
+            "title": "Metric Deltas",
+            "type": "object"
+          },
+          "regressed": {
+            "default": false,
+            "title": "Regressed",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "ComparisonResult",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "page-speed-insights"
+    },
+    {
+      "name": "save_speed_thresholds",
+      "description": "Save custom good/needs-improvement/poor thresholds for LCP/CLS/INP. Defaults are Google's own official Core Web Vitals thresholds.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "settings.update"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "lcp_good_ms": {
+            "default": 2500,
+            "description": "LCP порог good (мс)",
+            "minimum": 1,
+            "title": "Lcp Good Ms",
+            "type": "integer"
+          },
+          "lcp_poor_ms": {
+            "default": 4000,
+            "description": "LCP порог poor (мс)",
+            "minimum": 1,
+            "title": "Lcp Poor Ms",
+            "type": "integer"
+          },
+          "cls_good": {
+            "default": 0.1,
+            "description": "CLS порог good",
+            "minimum": 0,
+            "title": "Cls Good",
+            "type": "number"
+          },
+          "cls_poor": {
+            "default": 0.25,
+            "description": "CLS порог poor",
+            "minimum": 0,
+            "title": "Cls Poor",
+            "type": "number"
+          },
+          "inp_good_ms": {
+            "default": 200,
+            "description": "INP порог good (мс)",
+            "minimum": 1,
+            "title": "Inp Good Ms",
+            "type": "integer"
+          },
+          "inp_poor_ms": {
+            "default": 500,
+            "description": "INP порог poor (мс)",
+            "minimum": 1,
+            "title": "Inp Poor Ms",
+            "type": "integer"
+          }
+        },
+        "title": "SaveThresholdsParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "ScheduleState": {
+            "description": "Вложенный value-object внутри SettingsState -- обычная BaseModel, не\nsdl.Entity: у sdl.Entity id/title обязательны при КАЖДОМ создании\nэкземпляра (подтверждено чтением исходника imperal_sdk.sdl.Entity), а\nэто не имеет смысла для настроечного under-объекта без собственной\nидентичности в списках/панелях.",
+            "properties": {
+              "enabled": {
+                "default": false,
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "hour": {
+                "default": 3,
+                "title": "Hour",
+                "type": "integer"
+              },
+              "sites": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Sites",
+                "type": "array"
+              },
+              "last_run_date": {
+                "default": "",
+                "title": "Last Run Date",
+                "type": "string"
+              }
+            },
+            "title": "ScheduleState",
+            "type": "object"
+          },
+          "ThresholdsState": {
+            "properties": {
+              "lcp_good_ms": {
+                "default": 2500,
+                "title": "Lcp Good Ms",
+                "type": "integer"
+              },
+              "lcp_poor_ms": {
+                "default": 4000,
+                "title": "Lcp Poor Ms",
+                "type": "integer"
+              },
+              "cls_good": {
+                "default": 0.1,
+                "title": "Cls Good",
+                "type": "number"
+              },
+              "cls_poor": {
+                "default": 0.25,
+                "title": "Cls Poor",
+                "type": "number"
+              },
+              "inp_good_ms": {
+                "default": 200,
+                "title": "Inp Good Ms",
+                "type": "integer"
+              },
+              "inp_poor_ms": {
+                "default": 500,
+                "title": "Inp Poor Ms",
+                "type": "integer"
+              }
+            },
+            "title": "ThresholdsState",
+            "type": "object"
+          }
+        },
+        "description": "Всё настраиваемое приложения -- одна сущность для одного экрана\nApp settings (UI_INTERFACE_STANDARD.md, правило 3: всё в одном месте).\n\nЭТО единственный sdl.Entity во всей группе настроек -- id/title\nпередаются явно в handler-е (get_speed_settings), а не как\nclass-level default, потому что общий мутируемый default-инстанс на\nуровне класса это ещё и классическая pydantic/python ловушка общего\nизменяемого состояния между вызовами.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "key_connected": {
+            "default": false,
+            "title": "Key Connected",
+            "type": "boolean"
+          },
+          "thresholds": {
+            "$ref": "#/$defs/ThresholdsState"
+          },
+          "default_categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Default Categories",
+            "type": "array"
+          },
+          "retention_days": {
+            "default": 30,
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "notify_mode": {
+            "default": "regressions",
+            "title": "Notify Mode",
+            "type": "string"
+          },
+          "schedule": {
+            "$ref": "#/$defs/ScheduleState"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "SettingsState",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "page-speed-insights.save_thresholds",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "page-speed-insights"
+    },
+    {
+      "name": "save_speed_categories",
+      "description": "Save which Lighthouse categories run by default (performance always included).",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "settings.update"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "categories": {
+            "description": "Категории Lighthouse, включённые по умолчанию для проверок по расписанию",
+            "items": {
+              "type": "string"
+            },
+            "title": "Categories",
+            "type": "array"
+          }
+        },
+        "title": "SaveCategoryTogglesParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "ScheduleState": {
+            "description": "Вложенный value-object внутри SettingsState -- обычная BaseModel, не\nsdl.Entity: у sdl.Entity id/title обязательны при КАЖДОМ создании\nэкземпляра (подтверждено чтением исходника imperal_sdk.sdl.Entity), а\nэто не имеет смысла для настроечного under-объекта без собственной\nидентичности в списках/панелях.",
+            "properties": {
+              "enabled": {
+                "default": false,
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "hour": {
+                "default": 3,
+                "title": "Hour",
+                "type": "integer"
+              },
+              "sites": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Sites",
+                "type": "array"
+              },
+              "last_run_date": {
+                "default": "",
+                "title": "Last Run Date",
+                "type": "string"
+              }
+            },
+            "title": "ScheduleState",
+            "type": "object"
+          },
+          "ThresholdsState": {
+            "properties": {
+              "lcp_good_ms": {
+                "default": 2500,
+                "title": "Lcp Good Ms",
+                "type": "integer"
+              },
+              "lcp_poor_ms": {
+                "default": 4000,
+                "title": "Lcp Poor Ms",
+                "type": "integer"
+              },
+              "cls_good": {
+                "default": 0.1,
+                "title": "Cls Good",
+                "type": "number"
+              },
+              "cls_poor": {
+                "default": 0.25,
+                "title": "Cls Poor",
+                "type": "number"
+              },
+              "inp_good_ms": {
+                "default": 200,
+                "title": "Inp Good Ms",
+                "type": "integer"
+              },
+              "inp_poor_ms": {
+                "default": 500,
+                "title": "Inp Poor Ms",
+                "type": "integer"
+              }
+            },
+            "title": "ThresholdsState",
+            "type": "object"
+          }
+        },
+        "description": "Всё настраиваемое приложения -- одна сущность для одного экрана\nApp settings (UI_INTERFACE_STANDARD.md, правило 3: всё в одном месте).\n\nЭТО единственный sdl.Entity во всей группе настроек -- id/title\nпередаются явно в handler-е (get_speed_settings), а не как\nclass-level default, потому что общий мутируемый default-инстанс на\nуровне класса это ещё и классическая pydantic/python ловушка общего\nизменяемого состояния между вызовами.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "key_connected": {
+            "default": false,
+            "title": "Key Connected",
+            "type": "boolean"
+          },
+          "thresholds": {
+            "$ref": "#/$defs/ThresholdsState"
+          },
+          "default_categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Default Categories",
+            "type": "array"
+          },
+          "retention_days": {
+            "default": 30,
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "notify_mode": {
+            "default": "regressions",
+            "title": "Notify Mode",
+            "type": "string"
+          },
+          "schedule": {
+            "$ref": "#/$defs/ScheduleState"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "SettingsState",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "page-speed-insights.save_categories",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "page-speed-insights"
+    },
+    {
+      "name": "save_speed_retention",
+      "description": "Save how many days to keep raw Lighthouse snapshots before automatic cleanup.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "settings.update"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "retention_days": {
+            "default": 30,
+            "description": "Сколько дней хранить сырой Lighthouse JSON",
+            "maximum": 365,
+            "minimum": 1,
+            "title": "Retention Days",
+            "type": "integer"
+          }
+        },
+        "title": "SaveRetentionParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "ScheduleState": {
+            "description": "Вложенный value-object внутри SettingsState -- обычная BaseModel, не\nsdl.Entity: у sdl.Entity id/title обязательны при КАЖДОМ создании\nэкземпляра (подтверждено чтением исходника imperal_sdk.sdl.Entity), а\nэто не имеет смысла для настроечного under-объекта без собственной\nидентичности в списках/панелях.",
+            "properties": {
+              "enabled": {
+                "default": false,
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "hour": {
+                "default": 3,
+                "title": "Hour",
+                "type": "integer"
+              },
+              "sites": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Sites",
+                "type": "array"
+              },
+              "last_run_date": {
+                "default": "",
+                "title": "Last Run Date",
+                "type": "string"
+              }
+            },
+            "title": "ScheduleState",
+            "type": "object"
+          },
+          "ThresholdsState": {
+            "properties": {
+              "lcp_good_ms": {
+                "default": 2500,
+                "title": "Lcp Good Ms",
+                "type": "integer"
+              },
+              "lcp_poor_ms": {
+                "default": 4000,
+                "title": "Lcp Poor Ms",
+                "type": "integer"
+              },
+              "cls_good": {
+                "default": 0.1,
+                "title": "Cls Good",
+                "type": "number"
+              },
+              "cls_poor": {
+                "default": 0.25,
+                "title": "Cls Poor",
+                "type": "number"
+              },
+              "inp_good_ms": {
+                "default": 200,
+                "title": "Inp Good Ms",
+                "type": "integer"
+              },
+              "inp_poor_ms": {
+                "default": 500,
+                "title": "Inp Poor Ms",
+                "type": "integer"
+              }
+            },
+            "title": "ThresholdsState",
+            "type": "object"
+          }
+        },
+        "description": "Всё настраиваемое приложения -- одна сущность для одного экрана\nApp settings (UI_INTERFACE_STANDARD.md, правило 3: всё в одном месте).\n\nЭТО единственный sdl.Entity во всей группе настроек -- id/title\nпередаются явно в handler-е (get_speed_settings), а не как\nclass-level default, потому что общий мутируемый default-инстанс на\nуровне класса это ещё и классическая pydantic/python ловушка общего\nизменяемого состояния между вызовами.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "key_connected": {
+            "default": false,
+            "title": "Key Connected",
+            "type": "boolean"
+          },
+          "thresholds": {
+            "$ref": "#/$defs/ThresholdsState"
+          },
+          "default_categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Default Categories",
+            "type": "array"
+          },
+          "retention_days": {
+            "default": 30,
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "notify_mode": {
+            "default": "regressions",
+            "title": "Notify Mode",
+            "type": "string"
+          },
+          "schedule": {
+            "$ref": "#/$defs/ScheduleState"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "SettingsState",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "page-speed-insights.save_retention",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "page-speed-insights"
+    },
+    {
+      "name": "save_speed_notify_mode",
+      "description": "Save when to notify: all runs, only regressions, or off.",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "settings.update"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "notify_mode": {
+            "default": "regressions",
+            "description": "all | regressions | off",
+            "title": "Notify Mode",
+            "type": "string"
+          }
+        },
+        "title": "SaveNotifyModeParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "ScheduleState": {
+            "description": "Вложенный value-object внутри SettingsState -- обычная BaseModel, не\nsdl.Entity: у sdl.Entity id/title обязательны при КАЖДОМ создании\nэкземпляра (подтверждено чтением исходника imperal_sdk.sdl.Entity), а\nэто не имеет смысла для настроечного under-объекта без собственной\nидентичности в списках/панелях.",
+            "properties": {
+              "enabled": {
+                "default": false,
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "hour": {
+                "default": 3,
+                "title": "Hour",
+                "type": "integer"
+              },
+              "sites": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Sites",
+                "type": "array"
+              },
+              "last_run_date": {
+                "default": "",
+                "title": "Last Run Date",
+                "type": "string"
+              }
+            },
+            "title": "ScheduleState",
+            "type": "object"
+          },
+          "ThresholdsState": {
+            "properties": {
+              "lcp_good_ms": {
+                "default": 2500,
+                "title": "Lcp Good Ms",
+                "type": "integer"
+              },
+              "lcp_poor_ms": {
+                "default": 4000,
+                "title": "Lcp Poor Ms",
+                "type": "integer"
+              },
+              "cls_good": {
+                "default": 0.1,
+                "title": "Cls Good",
+                "type": "number"
+              },
+              "cls_poor": {
+                "default": 0.25,
+                "title": "Cls Poor",
+                "type": "number"
+              },
+              "inp_good_ms": {
+                "default": 200,
+                "title": "Inp Good Ms",
+                "type": "integer"
+              },
+              "inp_poor_ms": {
+                "default": 500,
+                "title": "Inp Poor Ms",
+                "type": "integer"
+              }
+            },
+            "title": "ThresholdsState",
+            "type": "object"
+          }
+        },
+        "description": "Всё настраиваемое приложения -- одна сущность для одного экрана\nApp settings (UI_INTERFACE_STANDARD.md, правило 3: всё в одном месте).\n\nЭТО единственный sdl.Entity во всей группе настроек -- id/title\nпередаются явно в handler-е (get_speed_settings), а не как\nclass-level default, потому что общий мутируемый default-инстанс на\nуровне класса это ещё и классическая pydantic/python ловушка общего\nизменяемого состояния между вызовами.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "key_connected": {
+            "default": false,
+            "title": "Key Connected",
+            "type": "boolean"
+          },
+          "thresholds": {
+            "$ref": "#/$defs/ThresholdsState"
+          },
+          "default_categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Default Categories",
+            "type": "array"
+          },
+          "retention_days": {
+            "default": 30,
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "notify_mode": {
+            "default": "regressions",
+            "title": "Notify Mode",
+            "type": "string"
+          },
+          "schedule": {
+            "$ref": "#/$defs/ScheduleState"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "SettingsState",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "page-speed-insights.save_notify_mode",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "page-speed-insights"
+    },
+    {
+      "name": "save_speed_schedule",
+      "description": "Turn on/off the daily automatic speed check and set its hour and site list (empty = every site in Sites Registry).",
+      "action_type": "write",
+      "chain_callable": true,
+      "effects": [
+        "settings.update"
+      ],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "enabled": {
+            "default": false,
+            "description": "Включить автоматическую ежедневную проверку",
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "hour": {
+            "default": 3,
+            "description": "Час запуска (0-23, часовой пояс сервера)",
+            "maximum": 23,
+            "minimum": 0,
+            "title": "Hour",
+            "type": "integer"
+          },
+          "sites": {
+            "default": "",
+            "description": "Сайты через запятую или с новой строки. Пусто -- все сайты из Sites Registry",
+            "title": "Sites",
+            "type": "string"
+          }
+        },
+        "title": "SaveScheduleParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "ScheduleState": {
+            "description": "Вложенный value-object внутри SettingsState -- обычная BaseModel, не\nsdl.Entity: у sdl.Entity id/title обязательны при КАЖДОМ создании\nэкземпляра (подтверждено чтением исходника imperal_sdk.sdl.Entity), а\nэто не имеет смысла для настроечного under-объекта без собственной\nидентичности в списках/панелях.",
+            "properties": {
+              "enabled": {
+                "default": false,
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "hour": {
+                "default": 3,
+                "title": "Hour",
+                "type": "integer"
+              },
+              "sites": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Sites",
+                "type": "array"
+              },
+              "last_run_date": {
+                "default": "",
+                "title": "Last Run Date",
+                "type": "string"
+              }
+            },
+            "title": "ScheduleState",
+            "type": "object"
+          },
+          "ThresholdsState": {
+            "properties": {
+              "lcp_good_ms": {
+                "default": 2500,
+                "title": "Lcp Good Ms",
+                "type": "integer"
+              },
+              "lcp_poor_ms": {
+                "default": 4000,
+                "title": "Lcp Poor Ms",
+                "type": "integer"
+              },
+              "cls_good": {
+                "default": 0.1,
+                "title": "Cls Good",
+                "type": "number"
+              },
+              "cls_poor": {
+                "default": 0.25,
+                "title": "Cls Poor",
+                "type": "number"
+              },
+              "inp_good_ms": {
+                "default": 200,
+                "title": "Inp Good Ms",
+                "type": "integer"
+              },
+              "inp_poor_ms": {
+                "default": 500,
+                "title": "Inp Poor Ms",
+                "type": "integer"
+              }
+            },
+            "title": "ThresholdsState",
+            "type": "object"
+          }
+        },
+        "description": "Всё настраиваемое приложения -- одна сущность для одного экрана\nApp settings (UI_INTERFACE_STANDARD.md, правило 3: всё в одном месте).\n\nЭТО единственный sdl.Entity во всей группе настроек -- id/title\nпередаются явно в handler-е (get_speed_settings), а не как\nclass-level default, потому что общий мутируемый default-инстанс на\nуровне класса это ещё и классическая pydantic/python ловушка общего\nизменяемого состояния между вызовами.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "key_connected": {
+            "default": false,
+            "title": "Key Connected",
+            "type": "boolean"
+          },
+          "thresholds": {
+            "$ref": "#/$defs/ThresholdsState"
+          },
+          "default_categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Default Categories",
+            "type": "array"
+          },
+          "retention_days": {
+            "default": 30,
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "notify_mode": {
+            "default": "regressions",
+            "title": "Notify Mode",
+            "type": "string"
+          },
+          "schedule": {
+            "$ref": "#/$defs/ScheduleState"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "SettingsState",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "page-speed-insights.save_schedule",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "page-speed-insights"
+    },
+    {
+      "name": "get_speed_settings",
+      "description": "Read every configurable Page Speed Insights setting in one call -- key status, thresholds, categories, retention, notify mode, schedule.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {},
+        "title": "GetScheduleParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "ScheduleState": {
+            "description": "Вложенный value-object внутри SettingsState -- обычная BaseModel, не\nsdl.Entity: у sdl.Entity id/title обязательны при КАЖДОМ создании\nэкземпляра (подтверждено чтением исходника imperal_sdk.sdl.Entity), а\nэто не имеет смысла для настроечного under-объекта без собственной\nидентичности в списках/панелях.",
+            "properties": {
+              "enabled": {
+                "default": false,
+                "title": "Enabled",
+                "type": "boolean"
+              },
+              "hour": {
+                "default": 3,
+                "title": "Hour",
+                "type": "integer"
+              },
+              "sites": {
+                "default": [],
+                "items": {
+                  "type": "string"
+                },
+                "title": "Sites",
+                "type": "array"
+              },
+              "last_run_date": {
+                "default": "",
+                "title": "Last Run Date",
+                "type": "string"
+              }
+            },
+            "title": "ScheduleState",
+            "type": "object"
+          },
+          "ThresholdsState": {
+            "properties": {
+              "lcp_good_ms": {
+                "default": 2500,
+                "title": "Lcp Good Ms",
+                "type": "integer"
+              },
+              "lcp_poor_ms": {
+                "default": 4000,
+                "title": "Lcp Poor Ms",
+                "type": "integer"
+              },
+              "cls_good": {
+                "default": 0.1,
+                "title": "Cls Good",
+                "type": "number"
+              },
+              "cls_poor": {
+                "default": 0.25,
+                "title": "Cls Poor",
+                "type": "number"
+              },
+              "inp_good_ms": {
+                "default": 200,
+                "title": "Inp Good Ms",
+                "type": "integer"
+              },
+              "inp_poor_ms": {
+                "default": 500,
+                "title": "Inp Poor Ms",
+                "type": "integer"
+              }
+            },
+            "title": "ThresholdsState",
+            "type": "object"
+          }
+        },
+        "description": "Всё настраиваемое приложения -- одна сущность для одного экрана\nApp settings (UI_INTERFACE_STANDARD.md, правило 3: всё в одном месте).\n\nЭТО единственный sdl.Entity во всей группе настроек -- id/title\nпередаются явно в handler-е (get_speed_settings), а не как\nclass-level default, потому что общий мутируемый default-инстанс на\nуровне класса это ещё и классическая pydantic/python ловушка общего\nизменяемого состояния между вызовами.",
+        "properties": {
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ],
+            "title": "Id"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "kind": {
+            "default": "",
+            "title": "Kind",
+            "type": "string"
+          },
+          "subtitle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Subtitle"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Description"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Status"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Url"
+          },
+          "key_connected": {
+            "default": false,
+            "title": "Key Connected",
+            "type": "boolean"
+          },
+          "thresholds": {
+            "$ref": "#/$defs/ThresholdsState"
+          },
+          "default_categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Default Categories",
+            "type": "array"
+          },
+          "retention_days": {
+            "default": 30,
+            "title": "Retention Days",
+            "type": "integer"
+          },
+          "notify_mode": {
+            "default": "regressions",
+            "title": "Notify Mode",
+            "type": "string"
+          },
+          "schedule": {
+            "$ref": "#/$defs/ScheduleState"
+          }
+        },
+        "required": [
+          "id",
+          "title"
+        ],
+        "title": "SettingsState",
+        "type": "object",
+        "x-sdl": "entity"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "page-speed-insights"
+    }
+  ],
+  "signals": [],
+  "schedules": [
+    {
+      "name": "psi_auto_check",
+      "cron": "10 * * * *"
+    }
+  ],
+  "required_scopes": [],
+  "icon_size_bytes": 348,
+  "exposed": [
+    {
+      "name": "ping",
+      "action_type": "read"
+    },
+    {
+      "name": "check_site_speed_ipc",
+      "action_type": "write"
+    }
+  ],
+  "lifecycle": {
+    "health_check": {
+      "interval_sec": 60
+    }
+  },
+  "secrets": [
+    {
+      "name": "pagespeed_api_key",
+      "description": "Your Google PageSpeed Insights API key -- console.cloud.google.com -> APIs & Services -> Library -> enable 'PageSpeed Insights API' -> Credentials -> Create API key. Free; your own daily quota applies (25,000 requests/day by default).",
+      "required": true,
+      "write_mode": "both",
+      "max_bytes": 200,
+      "scope": "user",
+      "rotation_hint_days": 180
+    }
+  ],
+  "panels": [
+    {
+      "panel_id": "secrets",
+      "slot": "right",
+      "title": "Secrets",
+      "tree": {},
+      "icon": "KeyRound",
+      "refresh": "manual",
+      "center_overlay": false
+    },
+    {
+      "panel_id": "psi_nav",
+      "slot": "left",
+      "title": "Page Speed Insights",
+      "tree": {},
+      "icon": "Gauge",
+      "refresh": "on_event:page-speed-insights.check_site_speed,page-speed-insights.connect_pagespeed,page-speed-insights.disconnect_pagespeed",
+      "center_overlay": false,
+      "default_width": 320,
+      "min_width": 260,
+      "max_width": 460
+    },
+    {
+      "panel_id": "psi",
+      "slot": "center",
+      "title": "Page Speed Insights",
+      "tree": {},
+      "icon": "",
+      "refresh": "manual",
+      "center_overlay": true
+    }
+  ]
+}
