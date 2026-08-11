@@ -22,6 +22,7 @@ from __future__ import annotations
 import ast
 import inspect
 import pathlib
+import re
 
 import pytest
 
@@ -123,3 +124,50 @@ async def test_nav_panel_renders_without_raising_after_connect():
     assert node is not None
     dumped = str(node)
     assert "check_site_speed" in dumped
+
+
+# --- события, которые ДОЛЖНЫ включать автообновление сайдбара --------------
+
+def test_sidebar_refresh_events_match_emitted_handler_events():
+    """ПОЧЕМУ ЭТОТ ТЕСТ СУЩЕСТВУЕТ (реальный инцидент 11.08.2026): после
+    успешного connect_pagespeed контент в панели не обновлялся сам. Причина:
+    handlers.py эмитил `event="page-speed-insights.connect"` (короткое имя),
+    а `psi_nav`'s `refresh="on_event:...` слушал `page-speed-insights.\n    connect_pagespeed` (полное имя функции) -- имена никогда не совпадали, и
+    подписка не срабатывала ни разу. То же было с disconnect/check.
+
+    Тест жёстко фиксирует: каждое событие, объявленное в on_event-списке
+    `psi_nav`, ДОЛЖНО реально эмититься каким-то chat.function в handlers.py
+    -- иначе подписка на автообновление тихо мертва.
+    """
+    handlers_src = (_ROOT / "handlers.py").read_text(encoding="utf-8")
+    panels_src = (_ROOT / "panels.py").read_text(encoding="utf-8")
+
+    emitted = set(re.findall(r'event="(page-speed-insights\.[a-z_]+)"', handlers_src))
+    assert emitted, "не нашла ни одного event= в handlers.py -- проверь регекс/файл"
+
+    # refresh может быть разбит на несколько строковых литералов подряд —
+    # склеиваем через AST (Python конкатенирует смежные строковые константы
+    # в один Constant при парсинге), а не хрупкий regex по кавычкам.
+    tree = ast.parse(panels_src)
+    refresh_value = None
+    for node in ast.walk(tree):
+        if isinstance(node, ast.keyword) and node.arg == "refresh":
+            refresh_value = ast.literal_eval(node.value) if isinstance(node.value, (ast.Constant, ast.JoinedStr)) else None
+            if refresh_value is None and isinstance(node.value, ast.BinOp):
+                # конкатенация строковых литералов через + не ожидается тут,
+                # но на случай смежных строковых констант ast уже склеил их
+                # в один Constant при парсинге -- fallback не нужен.
+                pass
+            if isinstance(refresh_value, str) and refresh_value.startswith("on_event:"):
+                break
+            refresh_value = None
+
+    assert refresh_value, "не нашла refresh=\"on_event:...\" у панели psi_nav"
+    subscribed = set(refresh_value.removeprefix("on_event:").split(","))
+
+    missing = subscribed - emitted
+    assert not missing, (
+        f"psi_nav подписан на события, которые НИКТО не эмитит: {missing} -- "
+        f"сайдбар никогда не обновится сам после этих действий. "
+        f"Реально эмитируемые события: {sorted(emitted)}"
+    )

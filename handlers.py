@@ -41,7 +41,7 @@ from shared import error as _error
     action_type="write",
     chain_callable=True,
     effects=["secret.write"],
-    event="page-speed-insights.connect",
+    event="page-speed-insights.connect_pagespeed",
     data_model=SettingsState,
 )
 async def connect_pagespeed(ctx, params: ConnectPagespeedParams) -> ActionResult:
@@ -69,7 +69,7 @@ async def connect_pagespeed(ctx, params: ConnectPagespeedParams) -> ActionResult
     action_type="write",
     chain_callable=True,
     effects=["secret.delete"],
-    event="page-speed-insights.disconnect",
+    event="page-speed-insights.disconnect_pagespeed",
     data_model=SettingsState,
 )
 async def disconnect_pagespeed(ctx, params: NoParams) -> ActionResult:
@@ -98,7 +98,7 @@ async def disconnect_pagespeed(ctx, params: NoParams) -> ActionResult:
     action_type="write",
     chain_callable=True,
     effects=["speed_snapshot.create"],
-    event="page-speed-insights.check",
+    event="page-speed-insights.check_site_speed",
     data_model=SpeedSnapshot,
 )
 async def check_site_speed(ctx, params: CheckSiteSpeedParams) -> ActionResult:
@@ -221,7 +221,7 @@ async def compare_speed_snapshots(ctx, params: CompareSnapshotsParams) -> Action
     action_type="write",
     chain_callable=True,
     effects=["settings.update"],
-    event="page-speed-insights.save_thresholds",
+    event="page-speed-insights.save_speed_thresholds",
     data_model=SettingsState,
 )
 async def save_speed_thresholds(ctx, params: SaveThresholdsParams) -> ActionResult:
@@ -243,7 +243,7 @@ async def save_speed_thresholds(ctx, params: SaveThresholdsParams) -> ActionResu
     action_type="write",
     chain_callable=True,
     effects=["settings.update"],
-    event="page-speed-insights.save_categories",
+    event="page-speed-insights.save_speed_categories",
     data_model=SettingsState,
 )
 async def save_speed_categories(ctx, params: SaveCategoryTogglesParams) -> ActionResult:
@@ -264,7 +264,7 @@ async def save_speed_categories(ctx, params: SaveCategoryTogglesParams) -> Actio
     action_type="write",
     chain_callable=True,
     effects=["settings.update"],
-    event="page-speed-insights.save_retention",
+    event="page-speed-insights.save_speed_retention",
     data_model=SettingsState,
 )
 async def save_speed_retention(ctx, params: SaveRetentionParams) -> ActionResult:
@@ -284,7 +284,7 @@ async def save_speed_retention(ctx, params: SaveRetentionParams) -> ActionResult
     action_type="write",
     chain_callable=True,
     effects=["settings.update"],
-    event="page-speed-insights.save_notify_mode",
+    event="page-speed-insights.save_speed_notify_mode",
     data_model=SettingsState,
 )
 async def save_speed_notify_mode(ctx, params: SaveNotifyModeParams) -> ActionResult:
@@ -304,7 +304,7 @@ async def save_speed_notify_mode(ctx, params: SaveNotifyModeParams) -> ActionRes
     action_type="write",
     chain_callable=True,
     effects=["settings.update"],
-    event="page-speed-insights.save_schedule",
+    event="page-speed-insights.save_speed_schedule",
     data_model=SettingsState,
 )
 async def save_speed_schedule(ctx, params: SaveScheduleParams) -> ActionResult:

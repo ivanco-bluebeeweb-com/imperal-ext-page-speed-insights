@@ -212,7 +212,7 @@
         "type": "object",
         "x-sdl": "entity"
       },
-      "event": "page-speed-insights.connect",
+      "event": "page-speed-insights.connect_pagespeed",
       "background": false,
       "long_running": false,
       "scopes": [],
@@ -408,7 +408,7 @@
         "type": "object",
         "x-sdl": "entity"
       },
-      "event": "page-speed-insights.disconnect",
+      "event": "page-speed-insights.disconnect_pagespeed",
       "background": false,
       "long_running": false,
       "scopes": [],
@@ -651,7 +651,7 @@
         "type": "object",
         "x-sdl": "entity"
       },
-      "event": "page-speed-insights.check",
+      "event": "page-speed-insights.check_site_speed",
       "background": false,
       "long_running": false,
       "scopes": [],
@@ -1428,7 +1428,7 @@
         "type": "object",
         "x-sdl": "entity"
       },
-      "event": "page-speed-insights.save_thresholds",
+      "event": "page-speed-insights.save_speed_thresholds",
       "background": false,
       "long_running": false,
       "scopes": [],
@@ -1633,7 +1633,7 @@
         "type": "object",
         "x-sdl": "entity"
       },
-      "event": "page-speed-insights.save_categories",
+      "event": "page-speed-insights.save_speed_categories",
       "background": false,
       "long_running": false,
       "scopes": [],
@@ -1838,7 +1838,7 @@
         "type": "object",
         "x-sdl": "entity"
       },
-      "event": "page-speed-insights.save_retention",
+      "event": "page-speed-insights.save_speed_retention",
       "background": false,
       "long_running": false,
       "scopes": [],
@@ -2041,7 +2041,7 @@
         "type": "object",
         "x-sdl": "entity"
       },
-      "event": "page-speed-insights.save_notify_mode",
+      "event": "page-speed-insights.save_speed_notify_mode",
       "background": false,
       "long_running": false,
       "scopes": [],
@@ -2258,7 +2258,7 @@
         "type": "object",
         "x-sdl": "entity"
       },
-      "event": "page-speed-insights.save_schedule",
+      "event": "page-speed-insights.save_speed_schedule",
       "background": false,
       "long_running": false,
       "scopes": [],
