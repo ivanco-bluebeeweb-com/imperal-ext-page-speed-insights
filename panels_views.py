@@ -194,7 +194,7 @@ async def settings_view(ctx) -> ui.UINode:
                 children=[
                     ui.MultiSelect(
                         param_name="categories",
-                        value=default_categories,
+                        values=default_categories,
                         options=[{"value": c, "label": c} for c in CATEGORIES],
                     ),
                 ],
