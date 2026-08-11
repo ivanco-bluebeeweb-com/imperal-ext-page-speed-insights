@@ -233,12 +233,20 @@ async def psi_nav_panel(ctx, **kwargs) -> ui.UINode:
         ),
     )
 
-    snapshot_cards = [_snapshot_card(s) for s in rows]
-    list_section = ui.Section(
-        title=f"Check history ({len(snapshot_cards)})",
+    running_count = sum(1 for row in rows if row.get("status") == "running")
+    history_summary = ui.Section(
+        title="Run history",
         children=[
-            ui.Stack(direction="v", gap=2, children=snapshot_cards)
-            if snapshot_cards else ui.Text("No checks yet.", variant="caption")
+            ui.Text(
+                (f"{len(rows)} saved run(s) · {running_count} running. "
+                 "Open the central workspace to see the full table and Details actions.")
+                if rows else "No checks yet. New runs will appear in the central workspace.",
+                variant="caption",
+            ),
+            ui.Button(
+                "Open run history", icon="TableProperties", variant="secondary", size="sm",
+                on_click=ui.Call("__panel__psi"),
+            ),
         ],
     )
 
@@ -246,7 +254,7 @@ async def psi_nav_panel(ctx, **kwargs) -> ui.UINode:
         connected_card,
         check_form,
         ui.Divider(),
-        list_section,
+        history_summary,
     ])
 
 
@@ -256,9 +264,10 @@ async def psi_nav_panel(ctx, **kwargs) -> ui.UINode:
     "psi",
     slot="center",
     title="Page Speed Insights",
-    # The run history is the app's primary workspace, not a temporary modal.
-    # Keeping it in the normal center slot makes it visible beside the sidebar.
-    center_overlay=False,
+    # The host only fetches center panels declared as overlays. This is still
+    # the app's persistent workspace; `center_overlay` is a host-loading
+    # requirement, not a request to render a transient toast/modal here.
+    center_overlay=True,
     refresh="on_event:page-speed-insights.check_site_speed",
 )
 async def psi_panel(ctx, **kwargs) -> ui.UINode:
@@ -271,7 +280,17 @@ async def psi_panel(ctx, **kwargs) -> ui.UINode:
     if view == "compare":
         return await compare_view(ctx, str(kwargs.get("url") or ""), str(kwargs.get("strategy") or ""))
 
-    rows = await st.list_snapshots(ctx, limit=50)
+    try:
+        rows = await st.list_snapshots(ctx, limit=50)
+    except Exception:
+        return ui.Stack(direction="v", gap=3, children=[
+            ui.Header(text="Speed check runs", level=2),
+            ui.Alert(
+                title="Run history could not load",
+                message="The saved-run service is temporarily unavailable. You can still start a new check from the left sidebar.",
+                type="error",
+            ),
+        ])
     if not rows:
         return ui.Stack(direction="v", gap=3, children=[
             ui.Header(text="Speed check runs", level=2,

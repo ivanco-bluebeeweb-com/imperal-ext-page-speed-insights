@@ -133,9 +133,11 @@ async def test_nav_panel_renders_without_raising_after_connect():
     dumped = str(node)
     assert "check_site_speed" in dumped
     assert "View latest analysis" in dumped
-    assert "View details" in dumped
+    assert "Run history" in dumped
+    assert "Open run history" in dumped
     assert snapshot_id in dumped
-    assert dumped.count("view': 'snapshot'") >= 2  # latest shortcut + per-result button
+    assert "__panel__psi" in dumped
+    assert "view': 'snapshot'" in dumped  # latest-analysis shortcut
 
 
 @pytest.mark.asyncio
@@ -168,6 +170,25 @@ async def test_center_panel_renders_run_table_statuses_and_details_action():
     assert "Details" in dumped
     assert completed_id in dumped
     assert "view': 'snapshot'" in dumped
+
+
+@pytest.mark.asyncio
+async def test_center_panel_keeps_visible_fallback_when_history_store_fails(monkeypatch):
+    """A store error must show a central diagnostic, never an empty workspace."""
+    from imperal_sdk.testing import MockContext, MockSecretStore
+    import panels
+
+    async def unavailable_history(_ctx, *, limit):
+        raise RuntimeError("simulated store outage")
+
+    monkeypatch.setattr(panels.st, "list_snapshots", unavailable_history)
+    ctx = MockContext()
+    ctx.secrets = MockSecretStore({"pagespeed_api_key": "test-key"})
+
+    node = await panels.psi_panel(ctx, host_navigation_state="initial")
+    dumped = str(node)
+    assert "Speed check runs" in dumped
+    assert "Run history could not load" in dumped
 
 
 @pytest.mark.asyncio
@@ -251,6 +272,18 @@ async def test_every_panel_accepts_arbitrary_platform_kwargs():
                 f"crash makes the sidebar disappear after its first skeleton "
                 f"render: {exc}"
             )
+
+
+def test_center_panel_is_declared_as_a_host_fetchable_overlay():
+    """A center panel with center_overlay=False is never fetched by the host.
+
+    The visible symptom is exactly a missing central workspace even though its
+    Python render function and its table tests both work locally.
+    """
+    panels_src = (_ROOT / "panels.py").read_text(encoding="utf-8")
+    assert '"psi",\n    slot="center"' in panels_src
+    center_block = panels_src.split('"psi",\n    slot="center"', 1)[1].split('async def psi_panel', 1)[0]
+    assert "center_overlay=True" in center_block
 
 
 # --- события, которые ДОЛЖНЫ включать автообновление сайдбара --------------

@@ -2515,7 +2515,7 @@
       "tree": {},
       "icon": "",
       "refresh": "on_event:page-speed-insights.check_site_speed",
-      "center_overlay": false
+      "center_overlay": true
     }
   ]
 }
