@@ -13,6 +13,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from imperal_sdk.testing import MockContext, MockSecretStore
 
 import handlers as h
+import handlers_ipc as hi
 from models import (
     CheckSiteSpeedParams, CompareSnapshotsParams, ConnectPagespeedParams,
     GetScheduleParams, GetSnapshotParams, ListSnapshotsParams, NoParams,
@@ -281,7 +282,7 @@ async def test_get_speed_settings_defaults_when_nothing_saved_yet():
 @pytest.mark.asyncio
 async def test_expose_ping_returns_ok_true_with_no_side_effects():
     ctx = _ctx()
-    result = await h.expose_ping(ctx)
+    result = await hi.expose_ping(ctx)
     assert result == {"ok": True}
 
 
@@ -290,7 +291,7 @@ async def test_expose_check_site_speed_ipc_degrades_gracefully_without_key():
     """The exact behaviour SEO Audit Engine (or any caller) depends on:
     NEVER raise across the IPC boundary -- always a dict with ok=False."""
     ctx = _ctx()
-    result = await h.expose_check_site_speed(ctx, url="climtec.md")
+    result = await hi.expose_check_site_speed(ctx, url="climtec.md")
     assert result["ok"] is False
     assert "error" in result
 
@@ -298,7 +299,7 @@ async def test_expose_check_site_speed_ipc_degrades_gracefully_without_key():
 @pytest.mark.asyncio
 async def test_expose_check_site_speed_ipc_returns_real_metrics_on_success():
     ctx = await _connected_ctx()
-    result = await h.expose_check_site_speed(ctx, url="climtec.md", strategy="mobile")
+    result = await hi.expose_check_site_speed(ctx, url="climtec.md", strategy="mobile")
     assert result["ok"] is True
     assert result["scores"]["performance"] == 0.92
     assert result["has_field_data"] is True
@@ -308,5 +309,5 @@ async def test_expose_check_site_speed_ipc_returns_real_metrics_on_success():
 @pytest.mark.asyncio
 async def test_expose_check_site_speed_ipc_requires_url():
     ctx = await _connected_ctx()
-    result = await h.expose_check_site_speed(ctx, url="")
+    result = await hi.expose_check_site_speed(ctx, url="")
     assert result["ok"] is False

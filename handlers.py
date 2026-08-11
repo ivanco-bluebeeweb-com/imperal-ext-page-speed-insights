@@ -1,15 +1,10 @@
-"""Chat-функции + IPC-поверхность для других приложений.
+"""Chat-функции: ключ, проверка, история, настройки.
 
-СТРУКТУРА ФАЙЛА (одним модулем, как у Sites Registry -- приложение
-небольшое, разделение на handlers_read/handlers_write было бы искусственным
-на этом объёме).
-
-ГЛАВНЫЙ IPC-КОНТРАКТ, вокруг которого построен весь план (PREPARATION.md,
-раздел про интеграцию): `check_site_speed_ipc` -- @ext.expose, без чата,
-однонаправленная зависимость (SEO Audit Engine узнаёт про это приложение,
-это приложение НЕ знает про SEO Audit Engine), best-effort деградация на
-стороне ВЫЗЫВАЮЩЕГО (тот же принцип, что list_connected_sites у Sites
-Registry / WordPress Hub).
+IPC-поверхность (@ext.expose) живёт в handlers_ipc.py -- разделение по
+входу (чат vs межпроцессный вызов), а не по CRUD-слою, потому что именно
+это разделение важно контракту PREPARATION.md (однонаправленная
+IPC-зависимость должна быть видна как отдельный маленький файл, а не
+затеряна среди 12 chat-функций).
 """
 
 from __future__ import annotations
@@ -19,58 +14,17 @@ from imperal_sdk import ActionResult
 import codes as c
 import psi_client as psi
 import storage as st
-from app import chat, ext
+from app import chat
+from core import build_settings_state, doc_to_snapshot, normalize_url, run_and_save
 from models import (
-    DEFAULT_THRESHOLDS, CheckSiteSpeedParams, ListSnapshotsParams,
-    GetSnapshotParams, CompareSnapshotsParams, ConnectPagespeedParams,
-    NoParams, SaveThresholdsParams, SaveCategoryTogglesParams,
-    SaveRetentionParams, SaveNotifyModeParams, SaveScheduleParams,
-    GetScheduleParams, SpeedSnapshot, MetricValue, Opportunity,
-    SnapshotSummary, SnapshotList, ComparisonResult, SettingsState,
-    ThresholdsState, ScheduleState,
+    CheckSiteSpeedParams, CompareSnapshotsParams, ComparisonResult,
+    ConnectPagespeedParams, GetScheduleParams, GetSnapshotParams,
+    ListSnapshotsParams, NoParams, SaveCategoryTogglesParams,
+    SaveNotifyModeParams, SaveRetentionParams, SaveScheduleParams,
+    SaveThresholdsParams, SettingsState, SnapshotList, SnapshotSummary,
+    SpeedSnapshot,
 )
-from shared import error as _error, categorize
-
-
-def _normalize_url(url: str) -> str:
-    """Голый домен -> https://домен. Уже полный URL остаётся как есть."""
-    u = (url or "").strip()
-    if not u:
-        return ""
-    if not u.startswith(("http://", "https://")):
-        u = f"https://{u}"
-    return u
-
-
-async def _get_api_key(ctx) -> str | None:
-    return await ctx.secrets.get("pagespeed_api_key")
-
-
-async def _build_settings_state(ctx) -> SettingsState:
-    """Собирает SettingsState из хранилища -- общее ядро для get_speed_settings
-    и каждого save_speed_* хендлера, чтобы ответ записи и ответ чтения были
-    ровно той же формой (narrator/audit ledger видят одну сущность, а не
-    разные срезы одних и тех же данных)."""
-    raw = await st.get_settings(ctx)
-    key = await _get_api_key(ctx)
-    thresholds = raw.get("thresholds") or DEFAULT_THRESHOLDS
-    schedule = raw.get("schedule") or {}
-    return SettingsState(
-        id="settings",
-        title="Page Speed Insights -- настройки",
-        key_connected=bool(key),
-        thresholds=ThresholdsState(**thresholds),
-        default_categories=raw.get("default_categories") or ["performance"],
-        retention_days=raw.get("retention_days", 30),
-        notify_mode=raw.get("notify_mode", "regressions"),
-        schedule=ScheduleState(
-            enabled=schedule.get("enabled", False),
-            hour=schedule.get("hour", 3),
-            sites=schedule.get("sites") or [],
-            last_run_date=schedule.get("last_run_date", ""),
-        ),
-    )
-
+from shared import error as _error
 
 # ──────────────────────────────────────────────────────────────────────────
 # Ключ: connect/disconnect
@@ -103,7 +57,7 @@ async def connect_pagespeed(ctx, params: ConnectPagespeedParams) -> ActionResult
         return _error(str(exc), exc.code, exc.retryable)
     await ctx.secrets.set("pagespeed_api_key", key)
     return ActionResult.success(
-        data=await _build_settings_state(ctx),
+        data=await build_settings_state(ctx),
         summary="Ключ Google PageSpeed Insights подключён и проверен.",
         refresh_panels=["psi_settings"],
     )
@@ -123,7 +77,7 @@ async def disconnect_pagespeed(ctx, params: NoParams) -> ActionResult:
     checks are blocked until a key is connected again."""
     await ctx.secrets.delete("pagespeed_api_key")
     return ActionResult.success(
-        data=await _build_settings_state(ctx),
+        data=await build_settings_state(ctx),
         summary="Ключ отключён. Прежние снимки скорости остались доступны.",
         refresh_panels=["psi_settings"],
     )
@@ -132,70 +86,6 @@ async def disconnect_pagespeed(ctx, params: NoParams) -> ActionResult:
 # ──────────────────────────────────────────────────────────────────────────
 # Основная проверка
 # ──────────────────────────────────────────────────────────────────────────
-
-async def _run_and_save(ctx, url: str, strategy: str, categories: list[str]) -> dict:
-    """Общее ядро: вызов Google + разбор + сохранение снимка.
-    Используется и из chat-функции, и из IPC-поверхности -- одна логика,
-    два входа."""
-    key = await _get_api_key(ctx)
-    if not key:
-        raise psi.ProviderError(
-            "Ключ Google PageSpeed Insights не подключён. Подключи его через "
-            "connect_pagespeed.", c.PSI_NO_KEY,
-        )
-    full_url = _normalize_url(url)
-    if not full_url:
-        raise psi.ProviderError("Не указан URL для проверки.", c.PSI_NO_URL)
-
-    payload = await psi.run_pagespeed(ctx, key, full_url, strategy=strategy, categories=categories)
-
-    thresholds = (await st.get_settings(ctx)).get("thresholds") or DEFAULT_THRESHOLDS
-    scores = psi.extract_scores(payload)
-    lab_raw = psi.extract_lab_metrics(payload)
-    field_raw, has_field_data = psi.extract_field_metrics(payload)
-    for m in lab_raw + field_raw:
-        m["category"] = categorize(m["name"], m["value"], thresholds)
-    opportunities = psi.extract_opportunities(payload)
-
-    doc = {
-        "url": full_url,
-        "strategy": strategy,
-        "categories": categories,
-        "scores": scores,
-        "field_metrics": field_raw,
-        "lab_metrics": lab_raw,
-        "has_field_data": has_field_data,
-        "opportunities": opportunities,
-        "checked_at": st.now_iso(),
-    }
-    snapshot_id = await st.save_snapshot(ctx, doc)
-    doc["id"] = snapshot_id
-    return doc
-
-
-def _to_metric_values(raw: list[dict]) -> list[MetricValue]:
-    return [MetricValue(**m) for m in raw]
-
-
-def _to_opportunities(raw: list[dict]) -> list[Opportunity]:
-    return [Opportunity(**o) for o in raw]
-
-
-def _doc_to_snapshot(doc: dict) -> SpeedSnapshot:
-    return SpeedSnapshot(
-        id=doc.get("id", ""),
-        title=f"{doc.get('url', '')} ({doc.get('strategy', '')})",
-        url=doc.get("url", ""),
-        strategy=doc.get("strategy", ""),
-        categories=doc.get("categories") or [],
-        scores=doc.get("scores") or {},
-        field_metrics=_to_metric_values(doc.get("field_metrics") or []),
-        lab_metrics=_to_metric_values(doc.get("lab_metrics") or []),
-        has_field_data=bool(doc.get("has_field_data")),
-        opportunities=_to_opportunities(doc.get("opportunities") or []),
-        checked_at=doc.get("checked_at", ""),
-    )
-
 
 @chat.function(
     "check_site_speed",
@@ -216,13 +106,13 @@ async def check_site_speed(ctx, params: CheckSiteSpeedParams) -> ActionResult:
     history snapshot. Raises no exception outward -- provider errors become
     a structured ActionResult.error via psi.ProviderError.code/.retryable."""
     try:
-        doc = await _run_and_save(ctx, params.url, params.strategy, params.categories)
+        doc = await run_and_save(ctx, params.url, params.strategy, params.categories)
     except psi.ProviderError as exc:
         return _error(str(exc), exc.code, exc.retryable)
     perf = doc["scores"].get("performance")
     perf_txt = f"{round(perf * 100)}/100" if perf is not None else "н/д"
     return ActionResult.success(
-        data=_doc_to_snapshot(doc),
+        data=doc_to_snapshot(doc),
         summary=f"Проверка {doc['url']} ({doc['strategy']}) готова: Performance {perf_txt}.",
         refresh_panels=["psi_snapshots"],
     )
@@ -274,7 +164,7 @@ async def get_speed_snapshot(ctx, params: GetSnapshotParams) -> ActionResult:
     doc = await st.get_snapshot(ctx, params.snapshot_id)
     if not doc:
         return _error(f"Снимок '{params.snapshot_id}' не найден.", c.PSI_RUN_NOT_FOUND)
-    return ActionResult.success(data=_doc_to_snapshot(doc), summary="Снимок загружен.")
+    return ActionResult.success(data=doc_to_snapshot(doc), summary="Снимок загружен.")
 
 
 @chat.function(
@@ -287,7 +177,7 @@ async def get_speed_snapshot(ctx, params: GetSnapshotParams) -> ActionResult:
 async def compare_speed_snapshots(ctx, params: CompareSnapshotsParams) -> ActionResult:
     """Diff the two most recent snapshots for one url+strategy -- score and
     metric deltas, plus a regressed flag when any score dropped meaningfully."""
-    full_url = _normalize_url(params.url)
+    full_url = normalize_url(params.url)
     pair = await st.latest_two(ctx, full_url, params.strategy)
     if len(pair) < 2:
         return _error(
@@ -341,7 +231,7 @@ async def save_speed_thresholds(ctx, params: SaveThresholdsParams) -> ActionResu
     thresholds = params.model_dump()
     await st.save_settings(ctx, {"thresholds": thresholds})
     return ActionResult.success(
-        data=await _build_settings_state(ctx),
+        data=await build_settings_state(ctx),
         summary="Пороги Core Web Vitals сохранены.",
         refresh_panels=["psi_settings"],
     )
@@ -362,7 +252,7 @@ async def save_speed_categories(ctx, params: SaveCategoryTogglesParams) -> Actio
     cats = list(dict.fromkeys(["performance"] + params.categories))
     await st.save_settings(ctx, {"default_categories": cats})
     return ActionResult.success(
-        data=await _build_settings_state(ctx),
+        data=await build_settings_state(ctx),
         summary=f"Категории по умолчанию сохранены: {', '.join(cats)}.",
         refresh_panels=["psi_settings"],
     )
@@ -382,7 +272,7 @@ async def save_speed_retention(ctx, params: SaveRetentionParams) -> ActionResult
     tick purges anything older than this."""
     await st.save_settings(ctx, {"retention_days": params.retention_days})
     return ActionResult.success(
-        data=await _build_settings_state(ctx),
+        data=await build_settings_state(ctx),
         summary=f"Снимки будут храниться {params.retention_days} дн.",
         refresh_panels=["psi_settings"],
     )
@@ -402,7 +292,7 @@ async def save_speed_notify_mode(ctx, params: SaveNotifyModeParams) -> ActionRes
     regressions, or never."""
     await st.save_settings(ctx, {"notify_mode": params.notify_mode})
     return ActionResult.success(
-        data=await _build_settings_state(ctx),
+        data=await build_settings_state(ctx),
         summary=f"Режим уведомлений: {params.notify_mode}.",
         refresh_panels=["psi_settings"],
     )
@@ -426,7 +316,7 @@ async def save_speed_schedule(ctx, params: SaveScheduleParams) -> ActionResult:
     await st.save_settings(ctx, {"schedule": schedule})
     state_txt = "включена" if params.enabled else "выключена"
     return ActionResult.success(
-        data=await _build_settings_state(ctx),
+        data=await build_settings_state(ctx),
         summary=f"Автопроверка {state_txt}, час запуска {params.hour}:00 UTC.",
         refresh_panels=["psi_settings"],
     )
@@ -442,48 +332,5 @@ async def save_speed_schedule(ctx, params: SaveScheduleParams) -> ActionResult:
 async def get_speed_settings(ctx, params: GetScheduleParams) -> ActionResult:
     """Read the whole App settings screen in one call: key status, thresholds,
     default categories, retention, notify mode, schedule."""
-    state = await _build_settings_state(ctx)
+    state = await build_settings_state(ctx)
     return ActionResult.success(data=state, summary="Настройки загружены.")
-
-
-# ──────────────────────────────────────────────────────────────────────────
-# IPC: другие приложения зовут это приложение без чата
-# ──────────────────────────────────────────────────────────────────────────
-
-@ext.expose("ping", action_type="read")
-async def expose_ping(ctx, **kwargs) -> dict:
-    """Read-only проверка присутствия -- по образцу Sites Registry: не
-    трогает ctx.store, отвечает {"ok": True} для любого достижимого вызова.
-    Позволяет вызывающему приложению (SEO Audit Engine) отличить
-    "не установлено" от "установлено, но нет ключа" без реальной проверки."""
-    return {"ok": True}
-
-
-@ext.expose("check_site_speed_ipc", action_type="write")
-async def expose_check_site_speed(ctx, url: str = "", strategy: str = "mobile",
-                                    categories: list[str] | None = None, **kwargs) -> dict:
-    """Прямой in-process IPC для других приложений (SEO Audit Engine и
-    любой будущий потребитель) -- без чата. Возвращает
-    {"ok": True, "scores": {...}, "field_metrics": [...], "lab_metrics": [...],
-    "has_field_data": bool, "top_opportunities": [...]} при успехе, или
-    {"ok": False, "error": "...", "retryable": bool} -- ВСЕГДА словарь, чтобы
-    вызывающая сторона могла тихо деградировать (best-effort, как того
-    требует контракт IPC в этом репозитории), не ловя исключение."""
-    if not url:
-        return {"ok": False, "error": "url is required", "retryable": False}
-    try:
-        doc = await _run_and_save(ctx, url, strategy, categories or ["performance"])
-    except psi.ProviderError as exc:
-        await ctx.log(f"check_site_speed_ipc failed for {url}: {exc.code}: {exc}", "warning")
-        return {"ok": False, "error": str(exc), "retryable": exc.retryable}
-    return {
-        "ok": True,
-        "url": doc["url"],
-        "strategy": doc["strategy"],
-        "scores": doc["scores"],
-        "field_metrics": doc["field_metrics"],
-        "lab_metrics": doc["lab_metrics"],
-        "has_field_data": doc["has_field_data"],
-        "top_opportunities": doc["opportunities"][:5],
-        "checked_at": doc["checked_at"],
-    }

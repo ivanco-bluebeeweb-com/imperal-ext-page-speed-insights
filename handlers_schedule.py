@@ -12,10 +12,10 @@ import time
 
 from imperal_sdk import ActionResult
 
-import handlers as h
 import psi_client as psi
 import storage as st
 from app import ext
+from core import run_and_save
 from models import DEFAULT_THRESHOLDS
 
 TICK_CRON = "10 * * * *"
@@ -90,7 +90,7 @@ async def psi_auto_check(ctx) -> None:
     for domain in sites:
         for strategy in ("mobile",):  # автопрогон по умолчанию мобильный -- он почти всегда хуже
             try:
-                doc = await h._run_and_save(ctx, domain, strategy, categories)
+                doc = await run_and_save(ctx, domain, strategy, categories)
                 checked += 1
                 pair = await st.latest_two(ctx, doc["url"], strategy)
                 if len(pair) == 2:
