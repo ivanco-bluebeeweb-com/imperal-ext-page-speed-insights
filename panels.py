@@ -103,7 +103,7 @@ def _snapshot_row(s: dict) -> ui.ListItem:
     refresh="on_event:page-speed-insights.check_site_speed,page-speed-insights.connect_pagespeed,"
             "page-speed-insights.disconnect_pagespeed",
 )
-async def psi_nav_panel(ctx) -> ui.UINode:
+async def psi_nav_panel(ctx, **kwargs) -> ui.UINode:
     key = await get_api_key(ctx)
     if not key:
         # До подключения -- ровно ОДНА карточка, ничего больше (тот же

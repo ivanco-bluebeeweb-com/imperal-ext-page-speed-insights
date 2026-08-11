@@ -126,6 +126,50 @@ async def test_nav_panel_renders_without_raising_after_connect():
     assert "check_site_speed" in dumped
 
 
+@pytest.mark.asyncio
+async def test_every_panel_accepts_arbitrary_platform_kwargs():
+    """ПОЧЕМУ ЭТОТ ТЕСТ СУЩЕСТВУЕТ (реальный инцидент 11.08.2026, репортован
+    Владом как "пустой сайдбар мигает на долю секунды и пропадает").
+
+    Root cause: SDK's @ext.panel decorator wraps every handler as
+    `async def wrapper(ctx, **params): result = await func(ctx, **params)`
+    (imperal_sdk/extension.py) -- the platform CAN and DOES call any panel
+    with extra keyword params (navigation state, view args, etc). `psi_nav_panel`
+    was declared as `async def psi_nav_panel(ctx) -> ui.UINode` -- no **kwargs.
+    The FIRST safe/param-less render (skeleton) showed fine, but the real
+    render with platform params raised TypeError, and the client silently
+    fell back to the generic Imperal Cloud welcome screen -- exactly what
+    the screenshot showed. Every other left-nav panel in this repo's sibling
+    apps (Aidentika Connector, Asana, Notion, SEO Audit Engine, Slack,
+    Trello -- checked directly) already takes **kwargs; this one didn't.
+
+    This test calls EVERY @ext.panel handler with an arbitrary extra kwarg
+    and fails loudly if any of them doesn't accept it.
+    """
+    from imperal_sdk.testing import MockContext, MockSecretStore
+    import panels
+
+    ctx = MockContext()
+    ctx.secrets = MockSecretStore({})
+
+    # Call the SOURCE functions, not app.ext.tools[...].func: the latter is
+    # the SDK wrapper, which always accepts **params and would mask the bug.
+    panel_handlers = {
+        "psi_nav_panel": panels.psi_nav_panel,
+        "psi_panel": panels.psi_panel,
+    }
+    for name, handler in panel_handlers.items():
+        try:
+            await handler(ctx, some_platform_param="x")
+        except TypeError as exc:
+            pytest.fail(
+                f"{name} does not accept arbitrary platform kwargs -- "
+                f"the platform CAN call any panel with extra params, and this "
+                f"crash makes the sidebar disappear after its first skeleton "
+                f"render: {exc}"
+            )
+
+
 # --- события, которые ДОЛЖНЫ включать автообновление сайдбара --------------
 
 def test_sidebar_refresh_events_match_emitted_handler_events():
