@@ -198,6 +198,11 @@ async def test_snapshot_detail_uses_clean_site_title_metadata_and_no_empty_field
     node = await panels_views.snapshot_view(ctx, snapshot_id)
     dumped = str(node)
     assert "Back to Page Speed Runs List" in dumped
+    back_button = node.props["children"][0]
+    assert back_button.props["on_click"].params == {
+        "function": "__panel__psi",
+        "params": {"view": ""},
+    }
     assert "Detailed Speed Check for Cleantech MD" in dumped
     assert "https://cleantech.md" not in dumped
     assert "Device" in dumped and "Desktop" in dumped

@@ -65,7 +65,7 @@ async def snapshot_view(ctx, snapshot_id: str) -> ui.UINode:
     children: list[ui.UINode] = [
         ui.Button(
             "Back to Page Speed Runs List", variant="ghost", icon="ArrowLeft",
-            on_click=ui.Call("__panel__psi"),
+            on_click=ui.Call("__panel__psi", view=""),
         ),
         ui.Header(text=f"Detailed Speed Check for {_site_name(str(s.get('url') or ''))}", level=3),
         ui.KeyValue(columns=2, items=[
