@@ -104,7 +104,25 @@ def _snapshot_row(s: dict) -> ui.ListItem:
             "page-speed-insights.disconnect_pagespeed",
 )
 async def psi_nav_panel(ctx, **kwargs) -> ui.UINode:
-    key = await get_api_key(ctx)
+    """Render a left panel in every state; never let a dependency failure
+    remove the entire slot from the host UI.
+
+    A panel call runs during initial page hydration. If Vault/store access
+    fails transiently, raising here makes the host discard the loaded panel
+    after its skeleton briefly appears. Return a visible diagnostic instead,
+    so the user can always see what happened and retry by reopening.
+    """
+    try:
+        key = await get_api_key(ctx)
+    except Exception:
+        return ui.Stack(direction="v", gap=3, children=[
+            ui.Alert(
+                title="Page Speed Insights could not load",
+                message="The saved-key service did not respond. Please reopen the app in a moment.",
+                type="error",
+            ),
+        ])
+
     if not key:
         # До подключения -- ровно ОДНА карточка, ничего больше (тот же
         # принцип, что у Aidentika: не рендерить форму проверки/историю,
@@ -118,7 +136,42 @@ async def psi_nav_panel(ctx, **kwargs) -> ui.UINode:
             ),
         ])
 
-    rows = await st.list_snapshots(ctx, limit=50)
+    try:
+        rows = await st.list_snapshots(ctx, limit=50)
+    except Exception:
+        return ui.Stack(direction="v", gap=3, children=[
+            ui.Card(
+                title="Page Speed Insights",
+                subtitle="Connected",
+                content=ui.Stack(direction="v", gap=2, children=[
+                    ui.Text("Google key saved and verified.", variant="caption"),
+                    ui.Button(
+                        "App settings", icon="Settings", variant="secondary", size="sm",
+                        on_click=ui.Call("__panel__psi", view="settings"),
+                    ),
+                ]),
+            ),
+            ui.Card(
+                title="Check site speed",
+                content=ui.Form(
+                    action="check_site_speed",
+                    submit_label="Check",
+                    children=[
+                        ui.Input(param_name="url", placeholder="Domain or URL, e.g. g4s.md"),
+                        ui.Select(
+                            param_name="strategy",
+                            value="mobile",
+                            options=[{"value": s, "label": s} for s in STRATEGIES],
+                        ),
+                    ],
+                ),
+            ),
+            ui.Alert(
+                title="Check history could not load",
+                message="The saved-check history is temporarily unavailable. You can still run a new check.",
+                type="error",
+            ),
+        ])
 
     connected_card = ui.Card(
         title="Page Speed Insights",

@@ -127,6 +127,45 @@ async def test_nav_panel_renders_without_raising_after_connect():
 
 
 @pytest.mark.asyncio
+async def test_nav_panel_keeps_visible_fallback_when_secret_service_fails(monkeypatch):
+    """Initial sidebar hydration must never disappear if Vault is temporarily unavailable."""
+    from imperal_sdk.testing import MockContext, MockSecretStore
+    import panels
+
+    async def unavailable_key(_ctx):
+        raise RuntimeError("simulated Vault outage")
+
+    monkeypatch.setattr(panels, "get_api_key", unavailable_key)
+    ctx = MockContext()
+    ctx.secrets = MockSecretStore({})
+
+    node = await panels.psi_nav_panel(ctx, host_navigation_state="initial")
+    dumped = str(node)
+    assert "Page Speed Insights could not load" in dumped
+    assert "saved-key service did not respond" in dumped
+
+
+@pytest.mark.asyncio
+async def test_nav_panel_keeps_visible_fallback_when_history_store_fails(monkeypatch):
+    """A history read failure must keep the connected sidebar visible and usable."""
+    from imperal_sdk.testing import MockContext, MockSecretStore
+    import panels
+
+    async def unavailable_history(_ctx, *, limit):
+        raise RuntimeError("simulated store outage")
+
+    monkeypatch.setattr(panels.st, "list_snapshots", unavailable_history)
+    ctx = MockContext()
+    ctx.secrets = MockSecretStore({"pagespeed_api_key": "test-key"})
+
+    node = await panels.psi_nav_panel(ctx, host_navigation_state="initial")
+    dumped = str(node)
+    assert "Page Speed Insights" in dumped
+    assert "Check site speed" in dumped
+    assert "Check history could not load" in dumped
+
+
+@pytest.mark.asyncio
 async def test_every_panel_accepts_arbitrary_platform_kwargs():
     """ПОЧЕМУ ЭТОТ ТЕСТ СУЩЕСТВУЕТ (реальный инцидент 11.08.2026, репортован
     Владом как "пустой сайдбар мигает на долю секунды и пропадает").
