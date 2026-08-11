@@ -166,11 +166,14 @@ async def test_center_panel_renders_run_table_statuses_and_details_action():
     node = await panels.psi_panel(ctx)
     dumped = str(node)
     assert "Speed check runs" in dumped
-    assert "Date & time" in dumped
+    assert "Select a completed check to open its full report." in dumped
+    assert "ListItem" in dumped
+    assert "DataTable" not in dumped
     assert "Desktop" in dumped and "Mobile" in dumped
     assert "90/100" in dumped
     assert "Running" in dumped and "Completed" in dumped
-    assert "Details" in dumped
+    assert "View details" in dumped
+    assert "[object Object]" not in dumped
     assert completed_id in dumped
     assert "view': 'snapshot'" in dumped
 

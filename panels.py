@@ -229,32 +229,41 @@ async def psi_panel(ctx, **kwargs) -> ui.UINode:
         raw = str(row.get("status") or "completed").lower()
         return {"running": "Running", "completed": "Completed", "failed": "Failed"}.get(raw, raw.title())
 
-    table_rows = [{
-        "url": row.get("url", "(no URL)"),
-        "checked_at": row.get("checked_at", ""),
-        "device": str(row.get("strategy") or "").title(),
-        "score": score(row),
-        "status": status(row),
-        "details": (
-            ui.Button(
-                "Details", variant="ghost", size="sm",
-                on_click=ui.Call("__panel__psi", view="snapshot", snapshot_id=row.get("id", "")),
-            )
-            if status(row) == "Completed" and row.get("id") else "—"
-        ),
-    } for row in rows]
+    list_items = [
+        ui.ListItem(
+            id=str(row.get("id") or f"run-{index}"),
+            title=str(row.get("url") or "(no URL)"),
+            subtitle=(
+                f"{row.get('checked_at') or 'Unknown time'} · "
+                f"{str(row.get('strategy') or 'unknown').title()} · "
+                f"Performance {score(row)}"
+            ),
+            meta=status(row),
+            badge=ui.Badge(
+                label=status(row),
+                color={"Completed": "green", "Running": "blue", "Failed": "red"}.get(status(row), "gray"),
+            ),
+            on_click=(
+                ui.Call("__panel__psi", view="snapshot", snapshot_id=str(row["id"]))
+                if row.get("id") else None
+            ),
+            actions=(
+                [{
+                    "icon": "ChartNoAxesCombined",
+                    "label": "View details",
+                    "on_click": ui.Call("__panel__psi", view="snapshot", snapshot_id=str(row["id"])),
+                }]
+                if row.get("id") else None
+            ),
+        )
+        for index, row in enumerate(rows, start=1)
+    ]
 
     return ui.Stack(direction="v", gap=3, children=[
-        ui.Header(text="Speed check runs", level=2),
-        ui.DataTable(
-            columns=[
-                ui.DataColumn("url", "Site", width="30%"),
-                ui.DataColumn("checked_at", "Date & time", width="22%"),
-                ui.DataColumn("device", "Device", width="12%"),
-                ui.DataColumn("score", "Performance", width="12%"),
-                ui.DataColumn("status", "Status", width="12%"),
-                ui.DataColumn("details", "Details", sortable=False, width="12%"),
-            ],
-            rows=table_rows,
+        ui.Header(
+            text="Speed check runs",
+            level=2,
+            subtitle="Select a completed check to open its full report.",
         ),
+        ui.List(items=list_items),
     ])
