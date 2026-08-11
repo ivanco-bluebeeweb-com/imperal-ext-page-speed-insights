@@ -10,6 +10,16 @@
     ui.Call("__panel__psi", view="compare", url=.., strategy=..) -> сравнение
     ui.Call("__panel__psi", view="settings")             -> App settings
 
+CONNECT-FIRST (тот же паттерн, что Aidentika Connector, по прямой просьбе
+Влада 11.08.2026 "сделай такой же интерфейс как в приложении айдентика"):
+пока ключ не подключён, `psi_nav_panel` рендерит РОВНО ОДНУ вещь -- карточку
+"Подключить Page Speed Insights" с формой api_key. Никакая форма проверки,
+история или кнопка настроек не показываются раньше времени -- они всё равно
+ничего не сделают без ключа. После успешного connect_pagespeed форма
+подключения уходит НАВСЕГДА (по той же стоящей норме -- переставать
+рендерить то, что больше не нужно), сайдбар показывает компактную карточку
+"Подключено" + форму проверки + историю.
+
 ОБЯЗАТЕЛЬНОЕ ПРАВИЛО (UI_INTERFACE_STANDARD.md, применено ДО кода в
 PREPARATION.md раздел 11): РОВНО ОДНА кнопка "App settings" в левом
 сайдбаре (`psi_nav`), рендерящая ВСЁ настраиваемое приложения одним
@@ -27,12 +37,39 @@ from imperal_sdk import ui
 
 from app import ext
 import storage as st
+from core import get_api_key
 from models import STRATEGIES
 from panels_views import compare_view, settings_view, snapshot_view
 
 
 def _score_pct(v: float) -> str:
     return f"{round(v * 100)}"
+
+
+def _connect_card() -> ui.UINode:
+    """До подключения ключа -- ровно ОДНО, что можно сделать (тот же паттерн,
+    что у Aidentika: connect_aidentika_-форма первой и единственной вещью в
+    сайдбаре, пока ключа нет -- никакой формы проверки/истории/настроек,
+    которые всё равно ничего не сделают без ключа)."""
+    return ui.Card(
+        title="Подключить Page Speed Insights",
+        subtitle="Свой ключ Google -- проверки идут по твоей собственной квоте",
+        content=ui.Stack(direction="v", gap=2, children=[
+            ui.Text(
+                "Бесплатный ключ: console.cloud.google.com -> APIs & Services -> "
+                "включить 'PageSpeed Insights API' -> Credentials -> Create API key. "
+                "Ключ проверяется перед сохранением.",
+                variant="caption",
+            ),
+            ui.Link(label="Открыть console.cloud.google.com",
+                     href="https://console.cloud.google.com/apis/library/pagespeedonline.googleapis.com"),
+            ui.Form(
+                action="connect_pagespeed",
+                submit_label="Проверить и подключить",
+                children=[ui.Password(param_name="api_key", placeholder="Google API key")],
+            ),
+        ]),
+    )
 
 
 def _snapshot_row(s: dict) -> ui.ListItem:
@@ -67,7 +104,33 @@ def _snapshot_row(s: dict) -> ui.ListItem:
             "page-speed-insights.disconnect_pagespeed",
 )
 async def psi_nav_panel(ctx) -> ui.UINode:
+    key = await get_api_key(ctx)
+    if not key:
+        # До подключения -- ровно ОДНА карточка, ничего больше (тот же
+        # принцип, что у Aidentika: не рендерить форму проверки/историю,
+        # которые всё равно ничего не сделают без ключа).
+        return ui.Stack(direction="v", gap=3, children=[
+            _connect_card(),
+            ui.Alert(
+                title="Ключ не подключён",
+                message="Подключи Google PageSpeed Insights, чтобы запускать проверки скорости.",
+                type="info",
+            ),
+        ])
+
     rows = await st.list_snapshots(ctx, limit=50)
+
+    connected_card = ui.Card(
+        title="Page Speed Insights",
+        subtitle="Подключено",
+        content=ui.Stack(direction="v", gap=2, children=[
+            ui.Text("Ключ Google сохранён и проверен.", variant="caption"),
+            ui.Button(
+                "App settings", icon="Settings", variant="secondary", size="sm",
+                on_click=ui.Call("__panel__psi", view="settings"),
+            ),
+        ]),
+    )
 
     check_form = ui.Card(
         title="Проверить скорость",
@@ -92,18 +155,11 @@ async def psi_nav_panel(ctx) -> ui.UINode:
                   else ui.Text("Проверок ещё не было.", variant="caption")],
     )
 
-    # РОВНО ОДНА secondary-кнопка "App settings" -- обязательное правило.
-    settings_button = ui.Button(
-        "App settings", icon="Settings", variant="secondary",
-        on_click=ui.Call("__panel__psi", view="settings"),
-    )
-
     return ui.Stack(direction="v", gap=3, children=[
+        connected_card,
         check_form,
         ui.Divider(),
         list_section,
-        ui.Divider(),
-        settings_button,
     ])
 
 

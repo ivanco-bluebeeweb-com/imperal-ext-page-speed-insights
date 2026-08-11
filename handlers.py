@@ -59,7 +59,7 @@ async def connect_pagespeed(ctx, params: ConnectPagespeedParams) -> ActionResult
     return ActionResult.success(
         data=await build_settings_state(ctx),
         summary="Ключ Google PageSpeed Insights подключён и проверен.",
-        refresh_panels=["psi_settings"],
+        refresh_panels=["psi_nav", "psi"],
     )
 
 
@@ -79,7 +79,7 @@ async def disconnect_pagespeed(ctx, params: NoParams) -> ActionResult:
     return ActionResult.success(
         data=await build_settings_state(ctx),
         summary="Ключ отключён. Прежние снимки скорости остались доступны.",
-        refresh_panels=["psi_settings"],
+        refresh_panels=["psi_nav", "psi"],
     )
 
 
@@ -114,7 +114,7 @@ async def check_site_speed(ctx, params: CheckSiteSpeedParams) -> ActionResult:
     return ActionResult.success(
         data=doc_to_snapshot(doc),
         summary=f"Проверка {doc['url']} ({doc['strategy']}) готова: Performance {perf_txt}.",
-        refresh_panels=["psi_snapshots"],
+        refresh_panels=["psi_nav", "psi"],
     )
 
 
@@ -233,7 +233,7 @@ async def save_speed_thresholds(ctx, params: SaveThresholdsParams) -> ActionResu
     return ActionResult.success(
         data=await build_settings_state(ctx),
         summary="Пороги Core Web Vitals сохранены.",
-        refresh_panels=["psi_settings"],
+        refresh_panels=["psi"],
     )
 
 
@@ -254,7 +254,7 @@ async def save_speed_categories(ctx, params: SaveCategoryTogglesParams) -> Actio
     return ActionResult.success(
         data=await build_settings_state(ctx),
         summary=f"Категории по умолчанию сохранены: {', '.join(cats)}.",
-        refresh_panels=["psi_settings"],
+        refresh_panels=["psi"],
     )
 
 
@@ -274,7 +274,7 @@ async def save_speed_retention(ctx, params: SaveRetentionParams) -> ActionResult
     return ActionResult.success(
         data=await build_settings_state(ctx),
         summary=f"Снимки будут храниться {params.retention_days} дн.",
-        refresh_panels=["psi_settings"],
+        refresh_panels=["psi"],
     )
 
 
@@ -294,7 +294,7 @@ async def save_speed_notify_mode(ctx, params: SaveNotifyModeParams) -> ActionRes
     return ActionResult.success(
         data=await build_settings_state(ctx),
         summary=f"Режим уведомлений: {params.notify_mode}.",
-        refresh_panels=["psi_settings"],
+        refresh_panels=["psi"],
     )
 
 
@@ -318,7 +318,7 @@ async def save_speed_schedule(ctx, params: SaveScheduleParams) -> ActionResult:
     return ActionResult.success(
         data=await build_settings_state(ctx),
         summary=f"Автопроверка {state_txt}, час запуска {params.hour}:00 UTC.",
-        refresh_panels=["psi_settings"],
+        refresh_panels=["psi"],
     )
 
 

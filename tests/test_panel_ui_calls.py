@@ -91,7 +91,10 @@ async def test_every_center_view_renders_without_raising(view: str):
 
 
 @pytest.mark.asyncio
-async def test_nav_panel_renders_without_raising():
+async def test_nav_panel_renders_without_raising_before_connect():
+    """Connect-first (тот же паттерн, что Aidentika Connector, 11.08.2026):
+    пока ключ не подключён, сайдбар обязан рендериться и показать РОВНО
+    карточку подключения -- не форму проверки, не историю."""
     from imperal_sdk.testing import MockContext, MockSecretStore
 
     import panels
@@ -101,3 +104,22 @@ async def test_nav_panel_renders_without_raising():
 
     node = await panels.psi_nav_panel(ctx)
     assert node is not None
+    dumped = str(node)
+    assert "connect_pagespeed" in dumped
+    assert "check_site_speed" not in dumped  # форма проверки ещё не должна показываться
+
+
+@pytest.mark.asyncio
+async def test_nav_panel_renders_without_raising_after_connect():
+    """После подключения -- форма проверки и история должны появиться."""
+    from imperal_sdk.testing import MockContext, MockSecretStore
+
+    import panels
+
+    ctx = MockContext()
+    ctx.secrets = MockSecretStore({"pagespeed_api_key": "fake-key-for-test"})
+
+    node = await panels.psi_nav_panel(ctx)
+    assert node is not None
+    dumped = str(node)
+    assert "check_site_speed" in dumped
