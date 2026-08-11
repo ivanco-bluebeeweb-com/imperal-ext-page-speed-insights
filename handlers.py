@@ -50,7 +50,7 @@ async def connect_pagespeed(ctx, params: ConnectPagespeedParams) -> ActionResult
     of failing silently on the first real check later."""
     key = (params.api_key or "").strip()
     if not key:
-        return _error("Дай, пожалуйста, реальный API-ключ.", c.PSI_NO_KEY)
+        return _error("Please provide a real API key.", c.PSI_NO_KEY)
     try:
         await psi.validate_api_key(ctx, key)
     except psi.ProviderError as exc:
@@ -58,7 +58,7 @@ async def connect_pagespeed(ctx, params: ConnectPagespeedParams) -> ActionResult
     await ctx.secrets.set("pagespeed_api_key", key)
     return ActionResult.success(
         data=await build_settings_state(ctx),
-        summary="Ключ Google PageSpeed Insights подключён и проверен.",
+        summary="Google PageSpeed Insights key connected and verified.",
         refresh_panels=["psi_nav", "psi"],
     )
 
@@ -78,7 +78,7 @@ async def disconnect_pagespeed(ctx, params: NoParams) -> ActionResult:
     await ctx.secrets.delete("pagespeed_api_key")
     return ActionResult.success(
         data=await build_settings_state(ctx),
-        summary="Ключ отключён. Прежние снимки скорости остались доступны.",
+        summary="Key disconnected. Past speed snapshots stay available.",
         refresh_panels=["psi_nav", "psi"],
     )
 
@@ -110,10 +110,10 @@ async def check_site_speed(ctx, params: CheckSiteSpeedParams) -> ActionResult:
     except psi.ProviderError as exc:
         return _error(str(exc), exc.code, exc.retryable)
     perf = doc["scores"].get("performance")
-    perf_txt = f"{round(perf * 100)}/100" if perf is not None else "н/д"
+    perf_txt = f"{round(perf * 100)}/100" if perf is not None else "n/a"
     return ActionResult.success(
         data=doc_to_snapshot(doc),
-        summary=f"Проверка {doc['url']} ({doc['strategy']}) готова: Performance {perf_txt}.",
+        summary=f"Check for {doc['url']} ({doc['strategy']}) is ready: Performance {perf_txt}.",
         refresh_panels=["psi_nav", "psi"],
     )
 
@@ -141,13 +141,13 @@ async def list_speed_snapshots(ctx, params: ListSnapshotsParams) -> ActionResult
     ]
     if not items:
         return _error(
-            "Проверок пока не было. Скажи, какой сайт проверить -- например "
-            "«проверь скорость climtec.md».", c.PSI_NO_RUNS,
+            "No checks yet. Tell me which site to check -- e.g. "
+            "\"check climtec.md's speed\".", c.PSI_NO_RUNS,
         )
     return ActionResult.success(
-        data=SnapshotList(id="snapshots", title="Снимки Page Speed Insights",
+        data=SnapshotList(id="snapshots", title="Page Speed Insights snapshots",
                            items=items, total=len(items)),
-        summary=f"{len(items)} снимок(ов).",
+        summary=f"{len(items)} snapshot(s).",
     )
 
 
@@ -163,8 +163,8 @@ async def get_speed_snapshot(ctx, params: GetSnapshotParams) -> ActionResult:
     just the summary row list_speed_snapshots returns."""
     doc = await st.get_snapshot(ctx, params.snapshot_id)
     if not doc:
-        return _error(f"Снимок '{params.snapshot_id}' не найден.", c.PSI_RUN_NOT_FOUND)
-    return ActionResult.success(data=doc_to_snapshot(doc), summary="Снимок загружен.")
+        return _error(f"Snapshot '{params.snapshot_id}' not found.", c.PSI_RUN_NOT_FOUND)
+    return ActionResult.success(data=doc_to_snapshot(doc), summary="Snapshot loaded.")
 
 
 @chat.function(
@@ -181,8 +181,8 @@ async def compare_speed_snapshots(ctx, params: CompareSnapshotsParams) -> Action
     pair = await st.latest_two(ctx, full_url, params.strategy)
     if len(pair) < 2:
         return _error(
-            "Для сравнения нужно минимум два прогона для этого url+стратегии. "
-            "Пока есть меньше -- запусти ещё одну проверку.", c.PSI_NO_RUNS,
+            "Comparison needs at least two runs for this url+strategy. "
+            "There are fewer right now -- run another check.", c.PSI_NO_RUNS,
         )
     current, previous = pair[0], pair[1]
     score_deltas = {
@@ -198,7 +198,7 @@ async def compare_speed_snapshots(ctx, params: CompareSnapshotsParams) -> Action
     regressed = any(v < -0.05 for v in score_deltas.values())
     result = ComparisonResult(
         id=f"{full_url}:{params.strategy}",
-        title=f"Сравнение -- {full_url} ({params.strategy})",
+        title=f"Comparison -- {full_url} ({params.strategy})",
         url=full_url,
         strategy=params.strategy,
         previous_checked_at=previous.get("checked_at", ""),
@@ -207,8 +207,8 @@ async def compare_speed_snapshots(ctx, params: CompareSnapshotsParams) -> Action
         metric_deltas=metric_deltas,
         regressed=regressed,
     )
-    verdict = "стало хуже" if regressed else "без регресса"
-    return ActionResult.success(data=result, summary=f"Сравнение готово: {verdict}.")
+    verdict = "regressed" if regressed else "no regression"
+    return ActionResult.success(data=result, summary=f"Comparison ready: {verdict}.")
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -232,7 +232,7 @@ async def save_speed_thresholds(ctx, params: SaveThresholdsParams) -> ActionResu
     await st.save_settings(ctx, {"thresholds": thresholds})
     return ActionResult.success(
         data=await build_settings_state(ctx),
-        summary="Пороги Core Web Vitals сохранены.",
+        summary="Core Web Vitals thresholds saved.",
         refresh_panels=["psi"],
     )
 
@@ -253,7 +253,7 @@ async def save_speed_categories(ctx, params: SaveCategoryTogglesParams) -> Actio
     await st.save_settings(ctx, {"default_categories": cats})
     return ActionResult.success(
         data=await build_settings_state(ctx),
-        summary=f"Категории по умолчанию сохранены: {', '.join(cats)}.",
+        summary=f"Default categories saved: {', '.join(cats)}.",
         refresh_panels=["psi"],
     )
 
@@ -273,7 +273,7 @@ async def save_speed_retention(ctx, params: SaveRetentionParams) -> ActionResult
     await st.save_settings(ctx, {"retention_days": params.retention_days})
     return ActionResult.success(
         data=await build_settings_state(ctx),
-        summary=f"Снимки будут храниться {params.retention_days} дн.",
+        summary=f"Snapshots will be kept for {params.retention_days} day(s).",
         refresh_panels=["psi"],
     )
 
@@ -293,7 +293,7 @@ async def save_speed_notify_mode(ctx, params: SaveNotifyModeParams) -> ActionRes
     await st.save_settings(ctx, {"notify_mode": params.notify_mode})
     return ActionResult.success(
         data=await build_settings_state(ctx),
-        summary=f"Режим уведомлений: {params.notify_mode}.",
+        summary=f"Notification mode: {params.notify_mode}.",
         refresh_panels=["psi"],
     )
 
@@ -314,10 +314,10 @@ async def save_speed_schedule(ctx, params: SaveScheduleParams) -> ActionResult:
     sites = [s.strip() for s in params.sites.replace("\n", ",").split(",") if s.strip()]
     schedule = {"enabled": params.enabled, "hour": params.hour, "sites": sites}
     await st.save_settings(ctx, {"schedule": schedule})
-    state_txt = "включена" if params.enabled else "выключена"
+    state_txt = "enabled" if params.enabled else "disabled"
     return ActionResult.success(
         data=await build_settings_state(ctx),
-        summary=f"Автопроверка {state_txt}, час запуска {params.hour}:00 UTC.",
+        summary=f"Automatic check {state_txt}, run hour {params.hour}:00 UTC.",
         refresh_panels=["psi"],
     )
 
@@ -333,4 +333,4 @@ async def get_speed_settings(ctx, params: GetScheduleParams) -> ActionResult:
     """Read the whole App settings screen in one call: key status, thresholds,
     default categories, retention, notify mode, schedule."""
     state = await build_settings_state(ctx)
-    return ActionResult.success(data=state, summary="Настройки загружены.")
+    return ActionResult.success(data=state, summary="Settings loaded.")

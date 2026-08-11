@@ -1,11 +1,11 @@
-"""Параметры инструментов и сущности результата.
+"""Tool parameters and result entities.
 
-Официальные пороги "good/needs improvement/poor" -- по решению владельца
-продукта используются пороги Google, не свои придуманные (см.
-PREPARATION.md, раздел 12): LCP <=2.5s good / <=4s needs improvement / >4s
+Official "good/needs improvement/poor" thresholds -- by product owner
+decision we use Google's own thresholds, not invented ones (see
+PREPARATION.md, section 12): LCP <=2.5s good / <=4s needs improvement / >4s
 poor; CLS <=0.1 / <=0.25 / >0.25; INP <=200ms / <=500ms / >500ms.
-Задаются как настройка (видны и подтверждаемы в UI), но со ЭТИМИ значениями
-по умолчанию -- не зашиты в код без возможности увидеть.
+Exposed as a setting (visible and confirmable in the UI), but WITH these
+default values -- not hardcoded without any way to see them.
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ DEFAULT_THRESHOLDS = {
 def _check_strategy(v: str) -> str:
     low = (v or "").strip().lower()
     if low and low not in STRATEGIES:
-        raise ValueError(f"неизвестная стратегия '{v}'. Допустимо: {', '.join(STRATEGIES)}")
+        raise ValueError(f"unknown strategy '{v}'. Allowed: {', '.join(STRATEGIES)}")
     return low or "mobile"
 
 
@@ -43,24 +43,24 @@ def _check_categories(values: list[str]) -> list[str]:
     bad = [v for v in values if v.lower() not in CATEGORIES]
     if bad:
         raise ValueError(
-            f"неизвестные категории {bad}. Допустимо: {', '.join(CATEGORIES)}"
+            f"unknown categories {bad}. Allowed: {', '.join(CATEGORIES)}"
         )
     return [v.lower() for v in values]
 
 
-# --------------------------- параметры чат-функций ---------------------------
+# --------------------------- chat function parameters ---------------------------
 
 class CheckSiteSpeedParams(BaseModel):
-    """Что и как проверять."""
+    """What and how to check."""
 
-    url: str = Field(..., description="Полный URL или домен страницы для проверки")
+    url: str = Field(..., description="Full URL or domain of the page to check")
     strategy: str = Field(
         "mobile",
-        description="Стратегия анализа: mobile или desktop. Пусто -> mobile.",
+        description="Analysis strategy: mobile or desktop. Empty -> mobile.",
     )
     categories: list[str] = Field(
         default_factory=lambda: ["performance"],
-        description="Категории Lighthouse: performance, accessibility, best-practices, seo, pwa",
+        description="Lighthouse categories: performance, accessibility, best-practices, seo, pwa",
     )
 
     @field_validator("strategy")
@@ -75,18 +75,18 @@ class CheckSiteSpeedParams(BaseModel):
 
 
 class ListSnapshotsParams(BaseModel):
-    url: str = Field("", description="Фильтр по URL/домену. Пусто -- все")
-    strategy: str = Field("", description="Фильтр по стратегии. Пусто -- все")
-    limit: int = Field(20, description="Сколько снимков вернуть", ge=1, le=100)
+    url: str = Field("", description="Filter by URL/domain. Empty -- all")
+    strategy: str = Field("", description="Filter by strategy. Empty -- all")
+    limit: int = Field(20, description="How many snapshots to return", ge=1, le=100)
 
 
 class GetSnapshotParams(BaseModel):
-    snapshot_id: str = Field(..., description="ID снимка из list_speed_snapshots")
+    snapshot_id: str = Field(..., description="Snapshot ID from list_speed_snapshots")
 
 
 class CompareSnapshotsParams(BaseModel):
-    url: str = Field(..., description="URL/домен, для которого сравнить два прогона")
-    strategy: str = Field("mobile", description="Стратегия анализа: mobile или desktop")
+    url: str = Field(..., description="URL/domain to compare the two latest runs for")
+    strategy: str = Field("mobile", description="Analysis strategy: mobile or desktop")
 
     @field_validator("strategy")
     @classmethod
@@ -95,7 +95,7 @@ class CompareSnapshotsParams(BaseModel):
 
 
 class ConnectPagespeedParams(BaseModel):
-    api_key: str = Field(..., description="Google PageSpeed Insights API key для проверки и сохранения")
+    api_key: str = Field(..., description="Google PageSpeed Insights API key to verify and save")
 
 
 class NoParams(BaseModel):
@@ -103,18 +103,18 @@ class NoParams(BaseModel):
 
 
 class SaveThresholdsParams(BaseModel):
-    lcp_good_ms: int = Field(2500, description="LCP порог good (мс)", ge=1)
-    lcp_poor_ms: int = Field(4000, description="LCP порог poor (мс)", ge=1)
-    cls_good: float = Field(0.1, description="CLS порог good", ge=0)
-    cls_poor: float = Field(0.25, description="CLS порог poor", ge=0)
-    inp_good_ms: int = Field(200, description="INP порог good (мс)", ge=1)
-    inp_poor_ms: int = Field(500, description="INP порог poor (мс)", ge=1)
+    lcp_good_ms: int = Field(2500, description="LCP good threshold (ms)", ge=1)
+    lcp_poor_ms: int = Field(4000, description="LCP poor threshold (ms)", ge=1)
+    cls_good: float = Field(0.1, description="CLS good threshold", ge=0)
+    cls_poor: float = Field(0.25, description="CLS poor threshold", ge=0)
+    inp_good_ms: int = Field(200, description="INP good threshold (ms)", ge=1)
+    inp_poor_ms: int = Field(500, description="INP poor threshold (ms)", ge=1)
 
 
 class SaveCategoryTogglesParams(BaseModel):
     categories: list[str] = Field(
         default_factory=lambda: ["performance"],
-        description="Категории Lighthouse, включённые по умолчанию для проверок по расписанию",
+        description="Lighthouse categories enabled by default for scheduled checks",
     )
 
     @field_validator("categories")
@@ -124,7 +124,7 @@ class SaveCategoryTogglesParams(BaseModel):
 
 
 class SaveRetentionParams(BaseModel):
-    retention_days: int = Field(30, description="Сколько дней хранить сырой Lighthouse JSON", ge=1, le=365)
+    retention_days: int = Field(30, description="How many days to keep raw Lighthouse JSON", ge=1, le=365)
 
 
 class SaveNotifyModeParams(BaseModel):
@@ -135,14 +135,14 @@ class SaveNotifyModeParams(BaseModel):
     def _v_mode(cls, v):
         low = (v or "").strip().lower()
         if low and low not in NOTIFY_MODES:
-            raise ValueError(f"неизвестный режим '{v}'. Допустимо: {', '.join(NOTIFY_MODES)}")
+            raise ValueError(f"unknown mode '{v}'. Allowed: {', '.join(NOTIFY_MODES)}")
         return low or "regressions"
 
 
 class SaveScheduleParams(BaseModel):
-    enabled: bool = Field(False, description="Включить автоматическую ежедневную проверку")
-    hour: int = Field(3, description="Час запуска (0-23, часовой пояс сервера)", ge=0, le=23)
-    sites: str = Field("", description="Сайты через запятую или с новой строки. Пусто -- все сайты из Sites Registry")
+    enabled: bool = Field(False, description="Turn on the automatic daily check")
+    hour: int = Field(3, description="Run hour (0-23, server timezone)", ge=0, le=23)
+    sites: str = Field("", description="Sites, comma or newline separated. Empty -- all sites from Sites Registry")
 
 
 class GetScheduleParams(BaseModel):
@@ -152,11 +152,11 @@ class GetScheduleParams(BaseModel):
 # --------------------------- сущности результата ---------------------------
 
 class MetricValue(BaseModel):
-    """Одна метрика с числом, категорией (good/needs-improvement/poor) и
-    источником. Обычная BaseModel, не sdl.Entity: живёт только вложенной в
-    список внутри SpeedSnapshot, у неё нет собственной идентичности в UI --
-    тот же принцип, что list[dict] у AuditComparison.fixed/appeared/remains
-    в SEO Audit Engine."""
+    """One metric with a number, category (good/needs-improvement/poor) and
+    source. Regular BaseModel, not sdl.Entity: it only lives nested in a
+    list inside SpeedSnapshot, it has no own identity in the UI -- same
+    principle as list[dict] for AuditComparison.fixed/appeared/remains
+    in SEO Audit Engine."""
 
     name: str = ""            # LCP, CLS, INP, TTFB, FCP...
     value: float = 0.0
@@ -166,9 +166,9 @@ class MetricValue(BaseModel):
 
 
 class Opportunity(BaseModel):
-    """Одна рекомендация Lighthouse с потенциальной экономией времени.
-    Тоже обычная BaseModel -- вложенный элемент списка, не отдельная SDL-
-    сущность (см. пояснение у MetricValue)."""
+    """One Lighthouse recommendation with potential time savings.
+    Also a regular BaseModel -- a nested list element, not a separate SDL
+    entity (see the explanation on MetricValue)."""
 
     id: str = ""
     title: str = ""
@@ -178,7 +178,7 @@ class Opportunity(BaseModel):
 
 
 class SpeedSnapshot(sdl.Entity):
-    """Один снимок проверки: скоры, метрики, opportunities, timestamp."""
+    """One speed check snapshot: scores, metrics, opportunities, timestamp."""
 
     url: str = ""
     strategy: str = ""
@@ -193,9 +193,9 @@ class SpeedSnapshot(sdl.Entity):
 
 
 class SnapshotSummary(BaseModel):
-    """Краткая карточка снимка для списков -- без полного тела метрик.
-    Обычная BaseModel: живёт вложенной в SnapshotList.items, сам список
-    (SnapshotList) -- вот та сущность, что несёт SDL id/title."""
+    """A compact snapshot card for lists -- without the full metrics body.
+    Regular BaseModel: lives nested in SnapshotList.items, the list itself
+    (SnapshotList) is the entity that carries the SDL id/title."""
 
     id: str = ""
     url: str = ""
@@ -211,7 +211,7 @@ class SnapshotList(sdl.Entity):
 
 
 class ComparisonResult(sdl.Entity):
-    """Разница между двумя последними снимками одного url+strategy."""
+    """The difference between the two most recent snapshots of one url+strategy."""
 
     url: str = ""
     strategy: str = ""
@@ -223,11 +223,10 @@ class ComparisonResult(sdl.Entity):
 
 
 class ScheduleState(BaseModel):
-    """Вложенный value-object внутри SettingsState -- обычная BaseModel, не
-    sdl.Entity: у sdl.Entity id/title обязательны при КАЖДОМ создании
-    экземпляра (подтверждено чтением исходника imperal_sdk.sdl.Entity), а
-    это не имеет смысла для настроечного under-объекта без собственной
-    идентичности в списках/панелях."""
+    """A nested value-object inside SettingsState -- a regular BaseModel, not
+    an sdl.Entity: an sdl.Entity requires id/title on EVERY instantiation
+    (confirmed by reading the imperal_sdk.sdl.Entity source), which makes no
+    sense for a settings sub-object with no own identity in lists/panels."""
 
     enabled: bool = False
     hour: int = 3
@@ -245,14 +244,14 @@ class ThresholdsState(BaseModel):
 
 
 class SettingsState(sdl.Entity):
-    """Всё настраиваемое приложения -- одна сущность для одного экрана
-    App settings (UI_INTERFACE_STANDARD.md, правило 3: всё в одном месте).
+    """Everything configurable in the app -- one entity for one App settings
+    screen (UI_INTERFACE_STANDARD.md, rule 3: everything in one place).
 
-    ЭТО единственный sdl.Entity во всей группе настроек -- id/title
-    передаются явно в handler-е (get_speed_settings), а не как
-    class-level default, потому что общий мутируемый default-инстанс на
-    уровне класса это ещё и классическая pydantic/python ловушка общего
-    изменяемого состояния между вызовами."""
+    THIS is the only sdl.Entity in the whole settings group -- id/title are
+    passed explicitly in the handler (get_speed_settings), not as a
+    class-level default, because a shared mutable default instance at the
+    class level is also a classic pydantic/python shared-mutable-state
+    trap between calls."""
 
     key_connected: bool = False
     thresholds: ThresholdsState = Field(default_factory=ThresholdsState)

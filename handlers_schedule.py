@@ -107,9 +107,9 @@ async def psi_auto_check(ctx) -> None:
     if notify_mode == "regressions" and not regressions and not failures:
         return
 
-    lines = [f"Автопроверка Page Speed Insights: {checked} проверок готово."]
+    lines = [f"Page Speed Insights auto-check: {checked} check(s) done."]
     if regressions:
-        lines.append("Регресс скорости: " + "; ".join(regressions))
+        lines.append("Speed regression: " + "; ".join(regressions))
     if failures:
-        lines.append("Не удалось проверить: " + "; ".join(failures))
+        lines.append("Failed to check: " + "; ".join(failures))
     await ctx.deliver_chat_message("\n".join(lines), msg_type="system")

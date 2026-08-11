@@ -46,7 +46,7 @@ async def build_settings_state(ctx) -> SettingsState:
     schedule = raw.get("schedule") or {}
     return SettingsState(
         id="settings",
-        title="Page Speed Insights -- настройки",
+        title="Page Speed Insights -- settings",
         key_connected=bool(key),
         thresholds=ThresholdsState(**thresholds),
         default_categories=raw.get("default_categories") or ["performance"],
@@ -73,7 +73,7 @@ async def run_and_save(ctx, url: str, strategy: str, categories: list[str]) -> d
         )
     full_url = normalize_url(url)
     if not full_url:
-        raise psi.ProviderError("Не указан URL для проверки.", c.PSI_NO_URL)
+        raise psi.ProviderError("No URL was given to check.", c.PSI_NO_URL)
 
     payload = await psi.run_pagespeed(ctx, key, full_url, strategy=strategy, categories=categories)
 

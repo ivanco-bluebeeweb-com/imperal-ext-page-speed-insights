@@ -25,7 +25,7 @@
       "params_schema": {
         "properties": {
           "api_key": {
-            "description": "Google PageSpeed Insights API key для проверки и сохранения",
+            "description": "Google PageSpeed Insights API key to verify and save",
             "title": "Api Key",
             "type": "string"
           }
@@ -39,7 +39,7 @@
       "return_schema": {
         "$defs": {
           "ScheduleState": {
-            "description": "Вложенный value-object внутри SettingsState -- обычная BaseModel, не\nsdl.Entity: у sdl.Entity id/title обязательны при КАЖДОМ создании\nэкземпляра (подтверждено чтением исходника imperal_sdk.sdl.Entity), а\nэто не имеет смысла для настроечного under-объекта без собственной\nидентичности в списках/панелях.",
+            "description": "A nested value-object inside SettingsState -- a regular BaseModel, not\nan sdl.Entity: an sdl.Entity requires id/title on EVERY instantiation\n(confirmed by reading the imperal_sdk.sdl.Entity source), which makes no\nsense for a settings sub-object with no own identity in lists/panels.",
             "properties": {
               "enabled": {
                 "default": false,
@@ -105,7 +105,7 @@
             "type": "object"
           }
         },
-        "description": "Всё настраиваемое приложения -- одна сущность для одного экрана\nApp settings (UI_INTERFACE_STANDARD.md, правило 3: всё в одном месте).\n\nЭТО единственный sdl.Entity во всей группе настроек -- id/title\nпередаются явно в handler-е (get_speed_settings), а не как\nclass-level default, потому что общий мутируемый default-инстанс на\nуровне класса это ещё и классическая pydantic/python ловушка общего\nизменяемого состояния между вызовами.",
+        "description": "Everything configurable in the app -- one entity for one App settings\nscreen (UI_INTERFACE_STANDARD.md, rule 3: everything in one place).\n\nTHIS is the only sdl.Entity in the whole settings group -- id/title are\npassed explicitly in the handler (get_speed_settings), not as a\nclass-level default, because a shared mutable default instance at the\nclass level is also a classic pydantic/python shared-mutable-state\ntrap between calls.",
         "properties": {
           "id": {
             "anyOf": [
@@ -235,7 +235,7 @@
       "return_schema": {
         "$defs": {
           "ScheduleState": {
-            "description": "Вложенный value-object внутри SettingsState -- обычная BaseModel, не\nsdl.Entity: у sdl.Entity id/title обязательны при КАЖДОМ создании\nэкземпляра (подтверждено чтением исходника imperal_sdk.sdl.Entity), а\nэто не имеет смысла для настроечного under-объекта без собственной\nидентичности в списках/панелях.",
+            "description": "A nested value-object inside SettingsState -- a regular BaseModel, not\nan sdl.Entity: an sdl.Entity requires id/title on EVERY instantiation\n(confirmed by reading the imperal_sdk.sdl.Entity source), which makes no\nsense for a settings sub-object with no own identity in lists/panels.",
             "properties": {
               "enabled": {
                 "default": false,
@@ -301,7 +301,7 @@
             "type": "object"
           }
         },
-        "description": "Всё настраиваемое приложения -- одна сущность для одного экрана\nApp settings (UI_INTERFACE_STANDARD.md, правило 3: всё в одном месте).\n\nЭТО единственный sdl.Entity во всей группе настроек -- id/title\nпередаются явно в handler-е (get_speed_settings), а не как\nclass-level default, потому что общий мутируемый default-инстанс на\nуровне класса это ещё и классическая pydantic/python ловушка общего\nизменяемого состояния между вызовами.",
+        "description": "Everything configurable in the app -- one entity for one App settings\nscreen (UI_INTERFACE_STANDARD.md, rule 3: everything in one place).\n\nTHIS is the only sdl.Entity in the whole settings group -- id/title are\npassed explicitly in the handler (get_speed_settings), not as a\nclass-level default, because a shared mutable default instance at the\nclass level is also a classic pydantic/python shared-mutable-state\ntrap between calls.",
         "properties": {
           "id": {
             "anyOf": [
@@ -424,21 +424,21 @@
       ],
       "id_projection": "",
       "params_schema": {
-        "description": "Что и как проверять.",
+        "description": "What and how to check.",
         "properties": {
           "url": {
-            "description": "Полный URL или домен страницы для проверки",
+            "description": "Full URL or domain of the page to check",
             "title": "Url",
             "type": "string"
           },
           "strategy": {
             "default": "mobile",
-            "description": "Стратегия анализа: mobile или desktop. Пусто -> mobile.",
+            "description": "Analysis strategy: mobile or desktop. Empty -> mobile.",
             "title": "Strategy",
             "type": "string"
           },
           "categories": {
-            "description": "Категории Lighthouse: performance, accessibility, best-practices, seo, pwa",
+            "description": "Lighthouse categories: performance, accessibility, best-practices, seo, pwa",
             "items": {
               "type": "string"
             },
@@ -455,7 +455,7 @@
       "return_schema": {
         "$defs": {
           "MetricValue": {
-            "description": "Одна метрика с числом, категорией (good/needs-improvement/poor) и\nисточником. Обычная BaseModel, не sdl.Entity: живёт только вложенной в\nсписок внутри SpeedSnapshot, у неё нет собственной идентичности в UI --\nтот же принцип, что list[dict] у AuditComparison.fixed/appeared/remains\nв SEO Audit Engine.",
+            "description": "One metric with a number, category (good/needs-improvement/poor) and\nsource. Regular BaseModel, not sdl.Entity: it only lives nested in a\nlist inside SpeedSnapshot, it has no own identity in the UI -- same\nprinciple as list[dict] for AuditComparison.fixed/appeared/remains\nin SEO Audit Engine.",
             "properties": {
               "name": {
                 "default": "",
@@ -487,7 +487,7 @@
             "type": "object"
           },
           "Opportunity": {
-            "description": "Одна рекомендация Lighthouse с потенциальной экономией времени.\nТоже обычная BaseModel -- вложенный элемент списка, не отдельная SDL-\nсущность (см. пояснение у MetricValue).",
+            "description": "One Lighthouse recommendation with potential time savings.\nAlso a regular BaseModel -- a nested list element, not a separate SDL\nentity (see the explanation on MetricValue).",
             "properties": {
               "id": {
                 "default": "",
@@ -519,7 +519,7 @@
             "type": "object"
           }
         },
-        "description": "Один снимок проверки: скоры, метрики, opportunities, timestamp.",
+        "description": "One speed check snapshot: scores, metrics, opportunities, timestamp.",
         "properties": {
           "id": {
             "anyOf": [
@@ -668,19 +668,19 @@
         "properties": {
           "url": {
             "default": "",
-            "description": "Фильтр по URL/домену. Пусто -- все",
+            "description": "Filter by URL/domain. Empty -- all",
             "title": "Url",
             "type": "string"
           },
           "strategy": {
             "default": "",
-            "description": "Фильтр по стратегии. Пусто -- все",
+            "description": "Filter by strategy. Empty -- all",
             "title": "Strategy",
             "type": "string"
           },
           "limit": {
             "default": 20,
-            "description": "Сколько снимков вернуть",
+            "description": "How many snapshots to return",
             "maximum": 100,
             "minimum": 1,
             "title": "Limit",
@@ -693,7 +693,7 @@
       "return_schema": {
         "$defs": {
           "SnapshotSummary": {
-            "description": "Краткая карточка снимка для списков -- без полного тела метрик.\nОбычная BaseModel: живёт вложенной в SnapshotList.items, сам список\n(SnapshotList) -- вот та сущность, что несёт SDL id/title.",
+            "description": "A compact snapshot card for lists -- without the full metrics body.\nRegular BaseModel: lives nested in SnapshotList.items, the list itself\n(SnapshotList) is the entity that carries the SDL id/title.",
             "properties": {
               "id": {
                 "default": "",
@@ -837,7 +837,7 @@
       "params_schema": {
         "properties": {
           "snapshot_id": {
-            "description": "ID снимка из list_speed_snapshots",
+            "description": "Snapshot ID from list_speed_snapshots",
             "title": "Snapshot Id",
             "type": "string"
           }
@@ -851,7 +851,7 @@
       "return_schema": {
         "$defs": {
           "MetricValue": {
-            "description": "Одна метрика с числом, категорией (good/needs-improvement/poor) и\nисточником. Обычная BaseModel, не sdl.Entity: живёт только вложенной в\nсписок внутри SpeedSnapshot, у неё нет собственной идентичности в UI --\nтот же принцип, что list[dict] у AuditComparison.fixed/appeared/remains\nв SEO Audit Engine.",
+            "description": "One metric with a number, category (good/needs-improvement/poor) and\nsource. Regular BaseModel, not sdl.Entity: it only lives nested in a\nlist inside SpeedSnapshot, it has no own identity in the UI -- same\nprinciple as list[dict] for AuditComparison.fixed/appeared/remains\nin SEO Audit Engine.",
             "properties": {
               "name": {
                 "default": "",
@@ -883,7 +883,7 @@
             "type": "object"
           },
           "Opportunity": {
-            "description": "Одна рекомендация Lighthouse с потенциальной экономией времени.\nТоже обычная BaseModel -- вложенный элемент списка, не отдельная SDL-\nсущность (см. пояснение у MetricValue).",
+            "description": "One Lighthouse recommendation with potential time savings.\nAlso a regular BaseModel -- a nested list element, not a separate SDL\nentity (see the explanation on MetricValue).",
             "properties": {
               "id": {
                 "default": "",
@@ -915,7 +915,7 @@
             "type": "object"
           }
         },
-        "description": "Один снимок проверки: скоры, метрики, opportunities, timestamp.",
+        "description": "One speed check snapshot: scores, metrics, opportunities, timestamp.",
         "properties": {
           "id": {
             "anyOf": [
@@ -1063,13 +1063,13 @@
       "params_schema": {
         "properties": {
           "url": {
-            "description": "URL/домен, для которого сравнить два прогона",
+            "description": "URL/domain to compare the two latest runs for",
             "title": "Url",
             "type": "string"
           },
           "strategy": {
             "default": "mobile",
-            "description": "Стратегия анализа: mobile или desktop",
+            "description": "Analysis strategy: mobile or desktop",
             "title": "Strategy",
             "type": "string"
           }
@@ -1081,7 +1081,7 @@
         "type": "object"
       },
       "return_schema": {
-        "description": "Разница между двумя последними снимками одного url+strategy.",
+        "description": "The difference between the two most recent snapshots of one url+strategy.",
         "properties": {
           "id": {
             "anyOf": [
@@ -1208,42 +1208,42 @@
         "properties": {
           "lcp_good_ms": {
             "default": 2500,
-            "description": "LCP порог good (мс)",
+            "description": "LCP good threshold (ms)",
             "minimum": 1,
             "title": "Lcp Good Ms",
             "type": "integer"
           },
           "lcp_poor_ms": {
             "default": 4000,
-            "description": "LCP порог poor (мс)",
+            "description": "LCP poor threshold (ms)",
             "minimum": 1,
             "title": "Lcp Poor Ms",
             "type": "integer"
           },
           "cls_good": {
             "default": 0.1,
-            "description": "CLS порог good",
+            "description": "CLS good threshold",
             "minimum": 0,
             "title": "Cls Good",
             "type": "number"
           },
           "cls_poor": {
             "default": 0.25,
-            "description": "CLS порог poor",
+            "description": "CLS poor threshold",
             "minimum": 0,
             "title": "Cls Poor",
             "type": "number"
           },
           "inp_good_ms": {
             "default": 200,
-            "description": "INP порог good (мс)",
+            "description": "INP good threshold (ms)",
             "minimum": 1,
             "title": "Inp Good Ms",
             "type": "integer"
           },
           "inp_poor_ms": {
             "default": 500,
-            "description": "INP порог poor (мс)",
+            "description": "INP poor threshold (ms)",
             "minimum": 1,
             "title": "Inp Poor Ms",
             "type": "integer"
@@ -1255,7 +1255,7 @@
       "return_schema": {
         "$defs": {
           "ScheduleState": {
-            "description": "Вложенный value-object внутри SettingsState -- обычная BaseModel, не\nsdl.Entity: у sdl.Entity id/title обязательны при КАЖДОМ создании\nэкземпляра (подтверждено чтением исходника imperal_sdk.sdl.Entity), а\nэто не имеет смысла для настроечного under-объекта без собственной\nидентичности в списках/панелях.",
+            "description": "A nested value-object inside SettingsState -- a regular BaseModel, not\nan sdl.Entity: an sdl.Entity requires id/title on EVERY instantiation\n(confirmed by reading the imperal_sdk.sdl.Entity source), which makes no\nsense for a settings sub-object with no own identity in lists/panels.",
             "properties": {
               "enabled": {
                 "default": false,
@@ -1321,7 +1321,7 @@
             "type": "object"
           }
         },
-        "description": "Всё настраиваемое приложения -- одна сущность для одного экрана\nApp settings (UI_INTERFACE_STANDARD.md, правило 3: всё в одном месте).\n\nЭТО единственный sdl.Entity во всей группе настроек -- id/title\nпередаются явно в handler-е (get_speed_settings), а не как\nclass-level default, потому что общий мутируемый default-инстанс на\nуровне класса это ещё и классическая pydantic/python ловушка общего\nизменяемого состояния между вызовами.",
+        "description": "Everything configurable in the app -- one entity for one App settings\nscreen (UI_INTERFACE_STANDARD.md, rule 3: everything in one place).\n\nTHIS is the only sdl.Entity in the whole settings group -- id/title are\npassed explicitly in the handler (get_speed_settings), not as a\nclass-level default, because a shared mutable default instance at the\nclass level is also a classic pydantic/python shared-mutable-state\ntrap between calls.",
         "properties": {
           "id": {
             "anyOf": [
@@ -1446,7 +1446,7 @@
       "params_schema": {
         "properties": {
           "categories": {
-            "description": "Категории Lighthouse, включённые по умолчанию для проверок по расписанию",
+            "description": "Lighthouse categories enabled by default for scheduled checks",
             "items": {
               "type": "string"
             },
@@ -1460,7 +1460,7 @@
       "return_schema": {
         "$defs": {
           "ScheduleState": {
-            "description": "Вложенный value-object внутри SettingsState -- обычная BaseModel, не\nsdl.Entity: у sdl.Entity id/title обязательны при КАЖДОМ создании\nэкземпляра (подтверждено чтением исходника imperal_sdk.sdl.Entity), а\nэто не имеет смысла для настроечного under-объекта без собственной\nидентичности в списках/панелях.",
+            "description": "A nested value-object inside SettingsState -- a regular BaseModel, not\nan sdl.Entity: an sdl.Entity requires id/title on EVERY instantiation\n(confirmed by reading the imperal_sdk.sdl.Entity source), which makes no\nsense for a settings sub-object with no own identity in lists/panels.",
             "properties": {
               "enabled": {
                 "default": false,
@@ -1526,7 +1526,7 @@
             "type": "object"
           }
         },
-        "description": "Всё настраиваемое приложения -- одна сущность для одного экрана\nApp settings (UI_INTERFACE_STANDARD.md, правило 3: всё в одном месте).\n\nЭТО единственный sdl.Entity во всей группе настроек -- id/title\nпередаются явно в handler-е (get_speed_settings), а не как\nclass-level default, потому что общий мутируемый default-инстанс на\nуровне класса это ещё и классическая pydantic/python ловушка общего\nизменяемого состояния между вызовами.",
+        "description": "Everything configurable in the app -- one entity for one App settings\nscreen (UI_INTERFACE_STANDARD.md, rule 3: everything in one place).\n\nTHIS is the only sdl.Entity in the whole settings group -- id/title are\npassed explicitly in the handler (get_speed_settings), not as a\nclass-level default, because a shared mutable default instance at the\nclass level is also a classic pydantic/python shared-mutable-state\ntrap between calls.",
         "properties": {
           "id": {
             "anyOf": [
@@ -1652,7 +1652,7 @@
         "properties": {
           "retention_days": {
             "default": 30,
-            "description": "Сколько дней хранить сырой Lighthouse JSON",
+            "description": "How many days to keep raw Lighthouse JSON",
             "maximum": 365,
             "minimum": 1,
             "title": "Retention Days",
@@ -1665,7 +1665,7 @@
       "return_schema": {
         "$defs": {
           "ScheduleState": {
-            "description": "Вложенный value-object внутри SettingsState -- обычная BaseModel, не\nsdl.Entity: у sdl.Entity id/title обязательны при КАЖДОМ создании\nэкземпляра (подтверждено чтением исходника imperal_sdk.sdl.Entity), а\nэто не имеет смысла для настроечного under-объекта без собственной\nидентичности в списках/панелях.",
+            "description": "A nested value-object inside SettingsState -- a regular BaseModel, not\nan sdl.Entity: an sdl.Entity requires id/title on EVERY instantiation\n(confirmed by reading the imperal_sdk.sdl.Entity source), which makes no\nsense for a settings sub-object with no own identity in lists/panels.",
             "properties": {
               "enabled": {
                 "default": false,
@@ -1731,7 +1731,7 @@
             "type": "object"
           }
         },
-        "description": "Всё настраиваемое приложения -- одна сущность для одного экрана\nApp settings (UI_INTERFACE_STANDARD.md, правило 3: всё в одном месте).\n\nЭТО единственный sdl.Entity во всей группе настроек -- id/title\nпередаются явно в handler-е (get_speed_settings), а не как\nclass-level default, потому что общий мутируемый default-инстанс на\nуровне класса это ещё и классическая pydantic/python ловушка общего\nизменяемого состояния между вызовами.",
+        "description": "Everything configurable in the app -- one entity for one App settings\nscreen (UI_INTERFACE_STANDARD.md, rule 3: everything in one place).\n\nTHIS is the only sdl.Entity in the whole settings group -- id/title are\npassed explicitly in the handler (get_speed_settings), not as a\nclass-level default, because a shared mutable default instance at the\nclass level is also a classic pydantic/python shared-mutable-state\ntrap between calls.",
         "properties": {
           "id": {
             "anyOf": [
@@ -1868,7 +1868,7 @@
       "return_schema": {
         "$defs": {
           "ScheduleState": {
-            "description": "Вложенный value-object внутри SettingsState -- обычная BaseModel, не\nsdl.Entity: у sdl.Entity id/title обязательны при КАЖДОМ создании\nэкземпляра (подтверждено чтением исходника imperal_sdk.sdl.Entity), а\nэто не имеет смысла для настроечного under-объекта без собственной\nидентичности в списках/панелях.",
+            "description": "A nested value-object inside SettingsState -- a regular BaseModel, not\nan sdl.Entity: an sdl.Entity requires id/title on EVERY instantiation\n(confirmed by reading the imperal_sdk.sdl.Entity source), which makes no\nsense for a settings sub-object with no own identity in lists/panels.",
             "properties": {
               "enabled": {
                 "default": false,
@@ -1934,7 +1934,7 @@
             "type": "object"
           }
         },
-        "description": "Всё настраиваемое приложения -- одна сущность для одного экрана\nApp settings (UI_INTERFACE_STANDARD.md, правило 3: всё в одном месте).\n\nЭТО единственный sdl.Entity во всей группе настроек -- id/title\nпередаются явно в handler-е (get_speed_settings), а не как\nclass-level default, потому что общий мутируемый default-инстанс на\nуровне класса это ещё и классическая pydantic/python ловушка общего\nизменяемого состояния между вызовами.",
+        "description": "Everything configurable in the app -- one entity for one App settings\nscreen (UI_INTERFACE_STANDARD.md, rule 3: everything in one place).\n\nTHIS is the only sdl.Entity in the whole settings group -- id/title are\npassed explicitly in the handler (get_speed_settings), not as a\nclass-level default, because a shared mutable default instance at the\nclass level is also a classic pydantic/python shared-mutable-state\ntrap between calls.",
         "properties": {
           "id": {
             "anyOf": [
@@ -2060,13 +2060,13 @@
         "properties": {
           "enabled": {
             "default": false,
-            "description": "Включить автоматическую ежедневную проверку",
+            "description": "Turn on the automatic daily check",
             "title": "Enabled",
             "type": "boolean"
           },
           "hour": {
             "default": 3,
-            "description": "Час запуска (0-23, часовой пояс сервера)",
+            "description": "Run hour (0-23, server timezone)",
             "maximum": 23,
             "minimum": 0,
             "title": "Hour",
@@ -2074,7 +2074,7 @@
           },
           "sites": {
             "default": "",
-            "description": "Сайты через запятую или с новой строки. Пусто -- все сайты из Sites Registry",
+            "description": "Sites, comma or newline separated. Empty -- all sites from Sites Registry",
             "title": "Sites",
             "type": "string"
           }
@@ -2085,7 +2085,7 @@
       "return_schema": {
         "$defs": {
           "ScheduleState": {
-            "description": "Вложенный value-object внутри SettingsState -- обычная BaseModel, не\nsdl.Entity: у sdl.Entity id/title обязательны при КАЖДОМ создании\nэкземпляра (подтверждено чтением исходника imperal_sdk.sdl.Entity), а\nэто не имеет смысла для настроечного under-объекта без собственной\nидентичности в списках/панелях.",
+            "description": "A nested value-object inside SettingsState -- a regular BaseModel, not\nan sdl.Entity: an sdl.Entity requires id/title on EVERY instantiation\n(confirmed by reading the imperal_sdk.sdl.Entity source), which makes no\nsense for a settings sub-object with no own identity in lists/panels.",
             "properties": {
               "enabled": {
                 "default": false,
@@ -2151,7 +2151,7 @@
             "type": "object"
           }
         },
-        "description": "Всё настраиваемое приложения -- одна сущность для одного экрана\nApp settings (UI_INTERFACE_STANDARD.md, правило 3: всё в одном месте).\n\nЭТО единственный sdl.Entity во всей группе настроек -- id/title\nпередаются явно в handler-е (get_speed_settings), а не как\nclass-level default, потому что общий мутируемый default-инстанс на\nуровне класса это ещё и классическая pydantic/python ловушка общего\nизменяемого состояния между вызовами.",
+        "description": "Everything configurable in the app -- one entity for one App settings\nscreen (UI_INTERFACE_STANDARD.md, rule 3: everything in one place).\n\nTHIS is the only sdl.Entity in the whole settings group -- id/title are\npassed explicitly in the handler (get_speed_settings), not as a\nclass-level default, because a shared mutable default instance at the\nclass level is also a classic pydantic/python shared-mutable-state\ntrap between calls.",
         "properties": {
           "id": {
             "anyOf": [
@@ -2279,7 +2279,7 @@
       "return_schema": {
         "$defs": {
           "ScheduleState": {
-            "description": "Вложенный value-object внутри SettingsState -- обычная BaseModel, не\nsdl.Entity: у sdl.Entity id/title обязательны при КАЖДОМ создании\nэкземпляра (подтверждено чтением исходника imperal_sdk.sdl.Entity), а\nэто не имеет смысла для настроечного under-объекта без собственной\nидентичности в списках/панелях.",
+            "description": "A nested value-object inside SettingsState -- a regular BaseModel, not\nan sdl.Entity: an sdl.Entity requires id/title on EVERY instantiation\n(confirmed by reading the imperal_sdk.sdl.Entity source), which makes no\nsense for a settings sub-object with no own identity in lists/panels.",
             "properties": {
               "enabled": {
                 "default": false,
@@ -2345,7 +2345,7 @@
             "type": "object"
           }
         },
-        "description": "Всё настраиваемое приложения -- одна сущность для одного экрана\nApp settings (UI_INTERFACE_STANDARD.md, правило 3: всё в одном месте).\n\nЭТО единственный sdl.Entity во всей группе настроек -- id/title\nпередаются явно в handler-е (get_speed_settings), а не как\nclass-level default, потому что общий мутируемый default-инстанс на\nуровне класса это ещё и классическая pydantic/python ловушка общего\nизменяемого состояния между вызовами.",
+        "description": "Everything configurable in the app -- one entity for one App settings\nscreen (UI_INTERFACE_STANDARD.md, rule 3: everything in one place).\n\nTHIS is the only sdl.Entity in the whole settings group -- id/title are\npassed explicitly in the handler (get_speed_settings), not as a\nclass-level default, because a shared mutable default instance at the\nclass level is also a classic pydantic/python shared-mutable-state\ntrap between calls.",
         "properties": {
           "id": {
             "anyOf": [

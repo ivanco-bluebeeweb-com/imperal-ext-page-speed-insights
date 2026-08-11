@@ -32,7 +32,7 @@ def _metric_rows(metrics: list[dict]) -> ui.UINode:
 async def snapshot_view(ctx, snapshot_id: str) -> ui.UINode:
     s = await st.get_snapshot(ctx, snapshot_id)
     if not s:
-        return ui.Empty(message="Этот снимок не найден -- возможно, его уже удалили при очистке retention.")
+        return ui.Empty(message="This snapshot was not found -- it may have been removed by retention cleanup.")
 
     scores_row = ui.Stack(direction="h", gap=3, children=[
         ui.Stat(label=name.capitalize(), value=_score_pct(v))
@@ -49,35 +49,35 @@ async def snapshot_view(ctx, snapshot_id: str) -> ui.UINode:
     ]
 
     if field:
-        children.append(ui.Section(title="Полевые данные (реальные пользователи, CrUX)",
+        children.append(ui.Section(title="Field data (real users, CrUX)",
                                     children=[_metric_rows(field)]))
     else:
         children.append(ui.Alert(
-            title="Нет полевых данных",
-            message="У этой страницы недостаточно трафика в CrUX для полевых метрик -- показан только лабораторный прогон.",
+            title="No field data",
+            message="This page doesn't have enough CrUX traffic for field metrics -- showing lab run only.",
             type="info",
         ))
 
-    children.append(ui.Section(title="Лабораторный прогон (Lighthouse)", children=[_metric_rows(lab)]))
+    children.append(ui.Section(title="Lab run (Lighthouse)", children=[_metric_rows(lab)]))
 
     opps = s.get("opportunities") or []
     if opps:
         children.append(ui.Section(
-            title="Что чинить",
+            title="What to fix",
             children=[ui.KeyValue(
                 columns=1,
                 items=[
-                    {"key": o.get("title", ""), "value": f"~{round(o.get('savings_ms', 0))} мс"}
+                    {"key": o.get("title", ""), "value": f"~{round(o.get('savings_ms', 0))} ms"}
                     for o in opps
                 ],
             )],
         ))
 
     children.append(ui.Row(gap=2, children=[
-        ui.Button("Сравнить с прошлым разом", variant="secondary",
+        ui.Button("Compare with last time", variant="secondary",
                   on_click=ui.Call("__panel__psi", view="compare",
                                    url=s.get("url", ""), strategy=s.get("strategy", ""))),
-        ui.Button("Назад", variant="ghost", on_click=ui.Call("__panel__psi")),
+        ui.Button("Back", variant="ghost", on_click=ui.Call("__panel__psi")),
     ]))
 
     return ui.Stack(direction="v", gap=3, children=children)
@@ -89,29 +89,29 @@ async def compare_view(ctx, url: str, strategy: str) -> ui.UINode:
 
     result = await compare_speed_snapshots(ctx, CompareSnapshotsParams(url=url, strategy=strategy or "mobile"))
     if result.status != "success":
-        return ui.Alert(title="Сравнение недоступно", message=result.error or "нужно хотя бы два снимка", type="warning")
+        return ui.Alert(title="Comparison unavailable", message=result.error or "need at least two snapshots", type="warning")
 
     data = result.data
     kv_items = [
         {"key": f"Score: {name}", "value": f"{delta:+.2f}"}
         for name, delta in (data.score_deltas or {}).items()
     ] + [
-        {"key": f"Метрика: {name}", "value": f"{delta:+.0f}"}
+        {"key": f"Metric: {name}", "value": f"{delta:+.0f}"}
         for name, delta in (data.metric_deltas or {}).items()
     ]
     rows = [ui.KeyValue(columns=1, items=kv_items)] if kv_items else []
 
     return ui.Stack(direction="v", gap=3, children=[
-        ui.Header(text=f"Сравнение · {url}", level=3,
+        ui.Header(text=f"Comparison · {url}", level=3,
                   subtitle=f"{data.previous_checked_at} → {data.current_checked_at}"),
         ui.Alert(
-            title="Регресс" if data.regressed else "Без регресса",
-            message="Что-то из метрик просело сильнее порога." if data.regressed
-                     else "Показатели стабильны или улучшились.",
+            title="Regression" if data.regressed else "No regression",
+            message="One or more metrics dropped past the threshold." if data.regressed
+                     else "Metrics are stable or improved.",
             type="warning" if data.regressed else "success",
         ),
         ui.Stack(direction="v", gap=2, children=rows),
-        ui.Button("Назад", variant="ghost", on_click=ui.Call("__panel__psi")),
+        ui.Button("Back", variant="ghost", on_click=ui.Call("__panel__psi")),
     ])
 
 
@@ -131,66 +131,66 @@ async def settings_view(ctx) -> ui.UINode:
 
     children: list[ui.UINode] = [
         ui.Header(text="App settings", level=2,
-                  subtitle="Все настройки Page Speed Insights в одном месте"),
+                  subtitle="Every Page Speed Insights setting in one place"),
     ]
 
-    # 1. Ключ
+    # 1. Key
     children.append(ui.Section(
         title="Google PageSpeed Insights API key",
         children=[
             ui.Alert(
-                title="Ключ подключён" if key_connected else "Ключ не настроен",
+                title="Key connected" if key_connected else "Key not configured",
                 message=(
-                    "Проверки используют твой собственный дневной лимит Google."
+                    "Checks use your own daily Google quota."
                     if key_connected else
-                    "Получить бесплатный ключ: console.cloud.google.com -> APIs & "
-                    "Services -> включить 'PageSpeed Insights API' -> Credentials -> "
+                    "Get a free key: console.cloud.google.com -> APIs & "
+                    "Services -> enable 'PageSpeed Insights API' -> Credentials -> "
                     "Create API key."
                 ),
                 type="success" if key_connected else "warning",
             ),
             ui.Form(
                 action="connect_pagespeed",
-                submit_label="Проверить и сохранить",
+                submit_label="Verify and save",
                 children=[ui.Password(param_name="api_key", placeholder="Google API key")],
             ),
-        ] + ([ui.Button("Отключить ключ", variant="danger", size="sm",
+        ] + ([ui.Button("Disconnect key", variant="danger", size="sm",
                         on_click=ui.Call("disconnect_pagespeed"))] if key_connected else []),
     ))
 
-    # 2. Пороги Core Web Vitals
+    # 2. Core Web Vitals thresholds
     t = thresholds
     children.append(ui.Section(
-        title="Пороги Core Web Vitals (по умолчанию -- официальные пороги Google)",
+        title="Core Web Vitals thresholds (defaults -- Google's official thresholds)",
         children=[
             ui.Form(
                 action="save_speed_thresholds",
-                submit_label="Сохранить пороги",
+                submit_label="Save thresholds",
                 children=[
-                    ui.Input(param_name="lcp_good_ms", placeholder="LCP good, мс",
+                    ui.Input(param_name="lcp_good_ms", placeholder="LCP good, ms",
                              value=str(t.lcp_good_ms if t else DEFAULT_THRESHOLDS["lcp_good_ms"])),
-                    ui.Input(param_name="lcp_poor_ms", placeholder="LCP poor, мс",
+                    ui.Input(param_name="lcp_poor_ms", placeholder="LCP poor, ms",
                              value=str(t.lcp_poor_ms if t else DEFAULT_THRESHOLDS["lcp_poor_ms"])),
                     ui.Input(param_name="cls_good", placeholder="CLS good",
                              value=str(t.cls_good if t else DEFAULT_THRESHOLDS["cls_good"])),
                     ui.Input(param_name="cls_poor", placeholder="CLS poor",
                              value=str(t.cls_poor if t else DEFAULT_THRESHOLDS["cls_poor"])),
-                    ui.Input(param_name="inp_good_ms", placeholder="INP good, мс",
+                    ui.Input(param_name="inp_good_ms", placeholder="INP good, ms",
                              value=str(t.inp_good_ms if t else DEFAULT_THRESHOLDS["inp_good_ms"])),
-                    ui.Input(param_name="inp_poor_ms", placeholder="INP poor, мс",
+                    ui.Input(param_name="inp_poor_ms", placeholder="INP poor, ms",
                              value=str(t.inp_poor_ms if t else DEFAULT_THRESHOLDS["inp_poor_ms"])),
                 ],
             ),
         ],
     ))
 
-    # 3. Категории Lighthouse по умолчанию
+    # 3. Default Lighthouse categories
     children.append(ui.Section(
-        title="Категории Lighthouse по умолчанию (для автопроверок)",
+        title="Default Lighthouse categories (for automatic checks)",
         children=[
             ui.Form(
                 action="save_speed_categories",
-                submit_label="Сохранить категории",
+                submit_label="Save categories",
                 children=[
                     ui.MultiSelect(
                         param_name="categories",
@@ -204,14 +204,14 @@ async def settings_view(ctx) -> ui.UINode:
 
     # 4. Retention
     children.append(ui.Section(
-        title="Хранение сырого Lighthouse JSON",
+        title="Raw Lighthouse JSON retention",
         children=[
             ui.Form(
                 action="save_speed_retention",
-                submit_label="Сохранить",
+                submit_label="Save",
                 children=[
                     ui.Slider(param_name="retention_days", min=1, max=365,
-                              value=retention_days, label="Дней хранить сырой ответ"),
+                              value=retention_days, label="Days to keep the raw response"),
                 ],
             ),
         ],
@@ -219,11 +219,11 @@ async def settings_view(ctx) -> ui.UINode:
 
     # 5. Notify mode
     children.append(ui.Section(
-        title="Уведомления",
+        title="Notifications",
         children=[
             ui.Form(
                 action="save_speed_notify_mode",
-                submit_label="Сохранить",
+                submit_label="Save",
                 children=[
                     ui.Select(
                         param_name="notify_mode", value=notify_mode,
@@ -234,31 +234,31 @@ async def settings_view(ctx) -> ui.UINode:
         ],
     ))
 
-    # 6. Расписание
+    # 6. Schedule
     sc = schedule
     children.append(ui.Section(
-        title="Автоматическая ежедневная проверка",
+        title="Automatic daily check",
         children=[
             ui.Text(
-                "Расписание -- будильник, а не сам прогон: реальный час "
-                "хранится тут и меняется без выкладки приложения.",
+                "The schedule is an alarm clock, not the run itself: the real "
+                "hour is stored here and can change without redeploying the app.",
                 variant="caption",
             ),
             ui.Form(
                 action="save_speed_schedule",
-                submit_label="Сохранить расписание",
+                submit_label="Save schedule",
                 children=[
-                    ui.Toggle(label="Включить автопроверку", param_name="enabled",
+                    ui.Toggle(label="Enable automatic check", param_name="enabled",
                               value=bool(sc.enabled) if sc else False),
                     ui.Slider(param_name="hour", min=0, max=23,
-                              value=sc.hour if sc else 3, label="Час запуска (UTC)"),
-                    ui.TextArea(param_name="sites", placeholder="Сайты через запятую (обязательно -- нет автосписка)",
+                              value=sc.hour if sc else 3, label="Run hour (UTC)"),
+                    ui.TextArea(param_name="sites", placeholder="Comma-separated sites (required -- no auto-list)",
                                 value=", ".join(sc.sites) if sc and sc.sites else ""),
                 ],
             ),
         ],
     ))
 
-    children.append(ui.Button("Назад", variant="ghost", on_click=ui.Call("__panel__psi")))
+    children.append(ui.Button("Back", variant="ghost", on_click=ui.Call("__panel__psi")))
 
     return ui.Stack(direction="v", gap=4, children=children)

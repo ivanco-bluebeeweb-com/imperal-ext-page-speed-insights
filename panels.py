@@ -52,20 +52,20 @@ def _connect_card() -> ui.UINode:
     сайдбаре, пока ключа нет -- никакой формы проверки/истории/настроек,
     которые всё равно ничего не сделают без ключа)."""
     return ui.Card(
-        title="Подключить Page Speed Insights",
-        subtitle="Свой ключ Google -- проверки идут по твоей собственной квоте",
+        title="Connect Page Speed Insights",
+        subtitle="Bring your own Google key -- checks run on your own quota",
         content=ui.Stack(direction="v", gap=2, children=[
             ui.Text(
-                "Бесплатный ключ: console.cloud.google.com -> APIs & Services -> "
-                "включить 'PageSpeed Insights API' -> Credentials -> Create API key. "
-                "Ключ проверяется перед сохранением.",
+                "Free key: console.cloud.google.com -> APIs & Services -> "
+                "enable 'PageSpeed Insights API' -> Credentials -> Create API key. "
+                "The key is verified before saving.",
                 variant="caption",
             ),
-            ui.Link(label="Открыть console.cloud.google.com",
+            ui.Link(label="Open console.cloud.google.com",
                      href="https://console.cloud.google.com/apis/library/pagespeedonline.googleapis.com"),
             ui.Form(
                 action="connect_pagespeed",
-                submit_label="Проверить и подключить",
+                submit_label="Verify and connect",
                 children=[ui.Password(param_name="api_key", placeholder="Google API key")],
             ),
         ]),
@@ -79,11 +79,11 @@ def _snapshot_row(s: dict) -> ui.ListItem:
         subtitle = f"{subtitle} · Performance {_score_pct(perf)}"
     return ui.ListItem(
         id=s.get("id", ""),
-        title=s.get("url", "(без URL)"),
+        title=s.get("url", "(no URL)"),
         subtitle=subtitle,
         meta=s.get("checked_at", ""),
         badge=ui.Badge(
-            label="полевые данные" if s.get("has_field_data") else "только lab",
+            label="field data" if s.get("has_field_data") else "lab only",
             color="green" if s.get("has_field_data") else "gray",
         ),
         on_click=ui.Call("__panel__psi", view="snapshot", snapshot_id=s.get("id", "")),
@@ -112,8 +112,8 @@ async def psi_nav_panel(ctx) -> ui.UINode:
         return ui.Stack(direction="v", gap=3, children=[
             _connect_card(),
             ui.Alert(
-                title="Ключ не подключён",
-                message="Подключи Google PageSpeed Insights, чтобы запускать проверки скорости.",
+                title="Key not connected",
+                message="Connect Google PageSpeed Insights to start running speed checks.",
                 type="info",
             ),
         ])
@@ -122,9 +122,9 @@ async def psi_nav_panel(ctx) -> ui.UINode:
 
     connected_card = ui.Card(
         title="Page Speed Insights",
-        subtitle="Подключено",
+        subtitle="Connected",
         content=ui.Stack(direction="v", gap=2, children=[
-            ui.Text("Ключ Google сохранён и проверен.", variant="caption"),
+            ui.Text("Google key saved and verified.", variant="caption"),
             ui.Button(
                 "App settings", icon="Settings", variant="secondary", size="sm",
                 on_click=ui.Call("__panel__psi", view="settings"),
@@ -133,12 +133,12 @@ async def psi_nav_panel(ctx) -> ui.UINode:
     )
 
     check_form = ui.Card(
-        title="Проверить скорость",
+        title="Check site speed",
         content=ui.Form(
             action="check_site_speed",
-            submit_label="Проверить",
+            submit_label="Check",
             children=[
-                ui.Input(param_name="url", placeholder="Домен или URL, например g4s.md"),
+                ui.Input(param_name="url", placeholder="Domain or URL, e.g. g4s.md"),
                 ui.Select(
                     param_name="strategy",
                     value="mobile",
@@ -150,9 +150,9 @@ async def psi_nav_panel(ctx) -> ui.UINode:
 
     items = [_snapshot_row(s) for s in rows]
     list_section = ui.Section(
-        title=f"История проверок ({len(items)})",
+        title=f"Check history ({len(items)})",
         children=[ui.List(items=items, searchable=True) if items
-                  else ui.Text("Проверок ещё не было.", variant="caption")],
+                  else ui.Text("No checks yet.", variant="caption")],
     )
 
     return ui.Stack(direction="v", gap=3, children=[
@@ -184,8 +184,8 @@ async def psi_panel(ctx, **kwargs) -> ui.UINode:
 
     rows = await st.list_snapshots(ctx, limit=50)
     if not rows:
-        return ui.Empty(message="Проверок ещё не было -- запусти первую из левой панели.")
+        return ui.Empty(message="No checks yet -- run your first one from the left sidebar.")
     return ui.Stack(direction="v", gap=3, children=[
-        ui.Header(text="История проверок", level=2),
+        ui.Header(text="Check history", level=2),
         ui.List(items=[_snapshot_row(s) for s in rows], searchable=True),
     ])

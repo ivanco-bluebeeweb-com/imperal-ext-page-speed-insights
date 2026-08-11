@@ -75,14 +75,14 @@ async def validate_api_key(ctx, api_key: str) -> None:
     params = {"url": "https://example.com", "key": api_key, "category": "PERFORMANCE"}
     resp = await ctx.http.get(BASE_URL, params=params, timeout=20)
     if resp.status_code == 400:
-        raise ProviderError("Google отклонил этот ключ (400 Bad Request).", "PSI_KEY_INVALID")
+        raise ProviderError("Google rejected this key (400 Bad Request).", "PSI_KEY_INVALID")
     if resp.status_code in (401, 403):
         raise ProviderError(
-            "Google отклонил этот ключ -- проверь, что PageSpeed Insights API включён "
-            "для этого проекта в Google Cloud Console.", "PSI_KEY_INVALID",
+            "Google rejected this key -- check that the PageSpeed Insights API "
+            "is enabled for this project in Google Cloud Console.", "PSI_KEY_INVALID",
         )
     if resp.status_code >= 400:
-        raise ProviderError(f"Google вернул код {resp.status_code} при проверке ключа.", "PSI_PROVIDER_ERROR", True)
+        raise ProviderError(f"Google returned status {resp.status_code} while verifying the key.", "PSI_PROVIDER_ERROR", True)
 
 
 async def run_pagespeed(
@@ -106,21 +106,21 @@ async def run_pagespeed(
             try:
                 return resp.json()
             except Exception as exc:
-                raise ProviderError(f"Ответ Google не распарсился как JSON: {exc}", "PSI_UNEXPECTED_RESPONSE")
+                raise ProviderError(f"Google's response could not be parsed as JSON: {exc}", "PSI_UNEXPECTED_RESPONSE")
         if resp.status_code == 429:
             last_exc = ProviderError(
-                "Google ограничил частоту проверок (дневной/секундный лимит).",
+                "Google throttled checks (daily/per-second rate limit).",
                 "PSI_RATE_LIMITED", True,
             )
         elif resp.status_code == 500:
             last_exc = ProviderError(
-                "Google временно ограничил проверки этого сайта (недокументированный throttling).",
+                "Google temporarily throttled checks for this site (undocumented throttling).",
                 "PSI_THROTTLED", True,
             )
         elif resp.status_code == 400:
-            raise ProviderError(f"Google не смог обработать URL '{url}' (400 Bad Request).", "PSI_BAD_URL")
+            raise ProviderError(f"Google could not process the URL '{url}' (400 Bad Request).", "PSI_BAD_URL")
         else:
-            raise ProviderError(f"Google вернул код {resp.status_code}.", "PSI_PROVIDER_ERROR", True)
+            raise ProviderError(f"Google returned status {resp.status_code}.", "PSI_PROVIDER_ERROR", True)
 
         if attempt < max_retries:
             await asyncio.sleep(2 ** attempt * 3)
