@@ -5,6 +5,9 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+from urllib.parse import urlparse
+
 from imperal_sdk import ui
 
 from models import CATEGORIES, DEFAULT_THRESHOLDS, NOTIFY_MODES
@@ -15,50 +18,78 @@ def _score_pct(v: float) -> str:
     return f"{round(v * 100)}"
 
 
-def _metric_rows(metrics: list[dict]) -> ui.UINode:
-    """ui.KeyValue принимает только items=[{key,value}] + columns (подтверждено
-    чтением исходника imperal_sdk.ui.KeyValue) -- нет отдельного badge-слота,
-    поэтому категория (good/needs-improvement/poor) идёт текстом в value."""
-    items = [
-        {
-            "key": f"{m.get('name', '')} ({m.get('source', '')})",
-            "value": f"{m.get('value', 0)} {m.get('unit', '')} -- {m.get('category', 'unknown')}",
-        }
-        for m in metrics
-    ]
-    return ui.KeyValue(items=items, columns=1)
+def _site_name(url: str) -> str:
+    """Turn a stored URL into a clean report label without inventing a brand."""
+    host = (urlparse(url).hostname or url or "").removeprefix("www.")
+    return " ".join(part.upper() if len(part) <= 3 else part.capitalize()
+                    for part in host.replace("-", " ").replace(".", " ").split())
+
+
+def _run_date_and_time(value: str) -> tuple[str, str]:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return parsed.strftime("%d %b %Y"), parsed.strftime("%H:%M UTC")
+    except (TypeError, ValueError):
+        return value or "—", "—"
+
+
+def _metric_cards(metrics: list[dict]) -> ui.UINode:
+    return ui.Grid(
+        columns=3,
+        gap=2,
+        children=[
+            ui.Card(
+                title=str(metric.get("name") or "Metric"),
+                subtitle=str(metric.get("category") or "").replace("-", " ").title(),
+                content=ui.Text(
+                    f"{metric.get('value', 0)} {metric.get('unit', '')}".strip(),
+                    variant="heading",
+                ),
+            )
+            for metric in metrics
+        ],
+    )
 
 
 async def snapshot_view(ctx, snapshot_id: str) -> ui.UINode:
     s = await st.get_snapshot(ctx, snapshot_id)
     if not s:
-        return ui.Empty(message="This snapshot was not found -- it may have been removed by retention cleanup.")
+        return ui.Empty(message="This speed check was not found.")
 
-    scores_row = ui.Stack(direction="h", gap=3, children=[
-        ui.Stat(label=name.capitalize(), value=_score_pct(v))
-        for name, v in (s.get("scores") or {}).items()
-    ])
-
+    date_run, time_run = _run_date_and_time(str(s.get("checked_at") or ""))
+    scores = s.get("scores") or {}
     field = s.get("field_metrics") or []
     lab = s.get("lab_metrics") or []
+    metrics = lab or field
 
     children: list[ui.UINode] = [
-        ui.Header(text=s.get("url", ""), level=3,
-                  subtitle=f"{s.get('strategy', '')} · {s.get('checked_at', '')}"),
-        scores_row,
+        ui.Button(
+            "Back to Page Speed Runs List", variant="ghost", icon="ArrowLeft",
+            on_click=ui.Call("__panel__psi"),
+        ),
+        ui.Header(text=f"Detailed Speed Check for {_site_name(str(s.get('url') or ''))}", level=3),
+        ui.KeyValue(columns=2, items=[
+            {"key": "Device", "value": str(s.get("strategy") or "—").title()},
+            {"key": "Date run", "value": date_run},
+            {"key": "Time run", "value": time_run},
+        ]),
     ]
 
-    if field:
-        children.append(ui.Section(title="Field data (real users, CrUX)",
-                                    children=[_metric_rows(field)]))
-    else:
-        children.append(ui.Alert(
-            title="No field data",
-            message="This page doesn't have enough CrUX traffic for field metrics -- showing lab run only.",
-            type="info",
+    if scores:
+        children.append(ui.Grid(
+            columns=3,
+            gap=2,
+            children=[
+                ui.Card(
+                    title=name.capitalize(),
+                    content=ui.Text(f"{_score_pct(value)}/100", variant="heading"),
+                )
+                for name, value in scores.items()
+            ],
         ))
 
-    children.append(ui.Section(title="Lab run (Lighthouse)", children=[_metric_rows(lab)]))
+    if metrics:
+        children.append(ui.Section(title="Metrics", children=[_metric_cards(metrics)]))
 
     opps = s.get("opportunities") or []
     if opps:
@@ -72,13 +103,6 @@ async def snapshot_view(ctx, snapshot_id: str) -> ui.UINode:
                 ],
             )],
         ))
-
-    children.append(ui.Row(gap=2, children=[
-        ui.Button("Compare with last time", variant="secondary",
-                  on_click=ui.Call("__panel__psi", view="compare",
-                                   url=s.get("url", ""), strategy=s.get("strategy", ""))),
-        ui.Button("Back", variant="ghost", on_click=ui.Call("__panel__psi")),
-    ]))
 
     return ui.Stack(direction="v", gap=3, children=children)
 

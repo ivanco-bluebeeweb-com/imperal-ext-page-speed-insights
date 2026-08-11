@@ -106,8 +106,10 @@ async def test_nav_panel_renders_without_raising_before_connect():
     node = await panels.psi_nav_panel(ctx)
     assert node is not None
     dumped = str(node)
-    assert "connect_pagespeed" in dumped
-    assert "check_site_speed" not in dumped  # форма проверки ещё не должна показываться
+    assert "Add account" in dumped
+    assert "check_site_speed" not in dumped
+    assert "connect_pagespeed" not in dumped
+    assert "Application Settings" not in dumped
 
 
 @pytest.mark.asyncio
@@ -131,13 +133,14 @@ async def test_nav_panel_renders_without_raising_after_connect():
     node = await panels.psi_nav_panel(ctx)
     assert node is not None
     dumped = str(node)
+    assert "Start checking site speed" in dumped
+    assert "Start check" in dumped
+    assert "Application Settings" in dumped
     assert "check_site_speed" in dumped
-    assert "View latest analysis" in dumped
-    assert "Run history" in dumped
-    assert "Open run history" in dumped
-    assert snapshot_id in dumped
-    assert "__panel__psi" in dumped
-    assert "view': 'snapshot'" in dumped  # latest-analysis shortcut
+    assert "View latest analysis" not in dumped
+    assert "Run history" not in dumped
+    assert snapshot_id not in dumped
+    assert "view': 'snapshot'" not in dumped
 
 
 @pytest.mark.asyncio
@@ -170,6 +173,35 @@ async def test_center_panel_renders_run_table_statuses_and_details_action():
     assert "Details" in dumped
     assert completed_id in dumped
     assert "view': 'snapshot'" in dumped
+
+
+@pytest.mark.asyncio
+async def test_snapshot_detail_uses_clean_site_title_metadata_and_no_empty_field_section():
+    """A detailed run reads like a report, never exposes stored URL plumbing."""
+    from imperal_sdk.testing import MockContext
+    import panels_views
+    import storage as st
+
+    ctx = MockContext()
+    snapshot_id = await st.save_snapshot(ctx, {
+        "url": "https://cleantech.md", "strategy": "desktop",
+        "checked_at": "2026-08-11T17:20:00Z",
+        "scores": {"performance": 0.91},
+        "lab_metrics": [{"name": "LCP", "value": 1800, "unit": "ms", "category": "good"}],
+        "field_metrics": [], "has_field_data": False,
+        "opportunities": [{"title": "Reduce unused JavaScript", "savings_ms": 340}],
+    })
+
+    node = await panels_views.snapshot_view(ctx, snapshot_id)
+    dumped = str(node)
+    assert "Back to Page Speed Runs List" in dumped
+    assert "Detailed Speed Check for Cleantech MD" in dumped
+    assert "https://cleantech.md" not in dumped
+    assert "Device" in dumped and "Desktop" in dumped
+    assert "Date run" in dumped and "Time run" in dumped
+    assert "Performance" in dumped and "91/100" in dumped
+    assert "LCP" in dumped and "What to fix" in dumped
+    assert "No field data" not in dumped
 
 
 @pytest.mark.asyncio
@@ -225,10 +257,10 @@ async def test_nav_panel_keeps_visible_fallback_when_history_store_fails(monkeyp
 
     node = await panels.psi_nav_panel(ctx, host_navigation_state="initial")
     dumped = str(node)
-    assert "Page Speed Insights" in dumped
-    assert "Check site speed" in dumped
-    assert "Run history" in dumped
-    assert "Open run history" in dumped
+    assert "Start checking site speed" in dumped
+    assert "Start check" in dumped
+    assert "Application Settings" in dumped
+    assert "Run history" not in dumped
     assert "Check history could not load" not in dumped
 
 

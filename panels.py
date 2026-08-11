@@ -144,122 +144,40 @@ async def psi_nav_panel(ctx, **kwargs) -> ui.UINode:
         ])
 
     if not key:
-        # До подключения -- ровно ОДНА карточка, ничего больше (тот же
-        # принцип, что у Aidentika: не рендерить форму проверки/историю,
-        # которые всё равно ничего не сделают без ключа).
+        # Before connection, the sidebar deliberately exposes one action only.
+        # The actual key form lives in Application Settings after Add account.
         return ui.Stack(direction="v", gap=3, children=[
-            _connect_card(),
-            ui.Alert(
-                title="Key not connected",
-                message="Connect Google PageSpeed Insights to start running speed checks.",
-                type="info",
+            ui.Button(
+                "Add account", icon="Plus", full_width=True,
+                on_click=ui.Call("__panel__psi", view="settings"),
             ),
         ])
 
-    try:
-        rows = await st.list_snapshots(ctx, limit=50)
-    except Exception:
-        return ui.Stack(direction="v", gap=3, children=[
-            ui.Card(
-                title="Page Speed Insights",
-                subtitle="Connected",
-                content=ui.Stack(direction="v", gap=2, children=[
-                    ui.Text("Google key saved and verified.", variant="caption"),
-                    ui.Button(
-                        "App settings", icon="Settings", variant="secondary", size="sm",
-                        on_click=ui.Call("__panel__psi", view="settings"),
-                    ),
-                ]),
-            ),
-            ui.Card(
-                title="Check site speed",
-                content=ui.Form(
+    return ui.Stack(direction="v", gap=3, children=[
+        ui.Section(
+            title="Start checking site speed",
+            children=[
+                ui.Form(
                     action="check_site_speed",
-                    submit_label="Check",
+                    submit_label="Start check",
                     children=[
-                        ui.Input(param_name="url", placeholder="Domain or URL, e.g. g4s.md"),
+                        ui.Input(param_name="url", placeholder="Site, e.g. cleantech.md"),
                         ui.Select(
                             param_name="strategy",
                             value="mobile",
-                            options=[{"value": s, "label": s} for s in STRATEGIES],
+                            options=[
+                                {"value": "mobile", "label": "Mobile"},
+                                {"value": "desktop", "label": "Desktop"},
+                            ],
                         ),
                     ],
                 ),
-            ),
-            ui.Section(
-                title="Run history",
-                children=[
-                    ui.Text("Open the central workspace to see saved runs and their status.", variant="caption"),
-                    ui.Button(
-                        "Open run history", icon="TableProperties", variant="secondary", size="sm",
-                        on_click=ui.Call("__panel__psi"),
-                    ),
-                ],
-            ),
-        ])
-
-    latest_snapshot = rows[0] if rows else None
-    connected_actions: list[ui.UINode] = [
-        ui.Button(
-            "App settings", icon="Settings", variant="secondary", size="sm",
-            on_click=ui.Call("__panel__psi", view="settings"),
-        ),
-    ]
-    if latest_snapshot and latest_snapshot.get("id"):
-        connected_actions.insert(0, ui.Button(
-            "View latest analysis", icon="ChartNoAxesCombined", variant="primary", size="sm",
-            on_click=ui.Call(
-                "__panel__psi", view="snapshot", snapshot_id=latest_snapshot["id"],
-            ),
-        ))
-
-    connected_card = ui.Card(
-        title="Page Speed Insights",
-        subtitle="Connected",
-        content=ui.Stack(direction="v", gap=2, children=[
-            ui.Text("Google key saved and verified.", variant="caption"),
-            *connected_actions,
-        ]),
-    )
-
-    check_form = ui.Card(
-        title="Check site speed",
-        content=ui.Form(
-            action="check_site_speed",
-            submit_label="Check",
-            children=[
-                ui.Input(param_name="url", placeholder="Domain or URL, e.g. g4s.md"),
-                ui.Select(
-                    param_name="strategy",
-                    value="mobile",
-                    options=[{"value": s, "label": s} for s in STRATEGIES],
-                ),
             ],
         ),
-    )
-
-    running_count = sum(1 for row in rows if row.get("status") == "running")
-    history_summary = ui.Section(
-        title="Run history",
-        children=[
-            ui.Text(
-                (f"{len(rows)} saved run(s) · {running_count} running. "
-                 "Open the central workspace to see the full table and Details actions.")
-                if rows else "No checks yet. New runs will appear in the central workspace.",
-                variant="caption",
-            ),
-            ui.Button(
-                "Open run history", icon="TableProperties", variant="secondary", size="sm",
-                on_click=ui.Call("__panel__psi"),
-            ),
-        ],
-    )
-
-    return ui.Stack(direction="v", gap=3, children=[
-        connected_card,
-        check_form,
-        ui.Divider(),
-        history_summary,
+        ui.Button(
+            "Application Settings", icon="Settings", variant="secondary", full_width=True,
+            on_click=ui.Call("__panel__psi", view="settings"),
+        ),
     ])
 
 
@@ -317,20 +235,17 @@ async def psi_panel(ctx, **kwargs) -> ui.UINode:
         "device": str(row.get("strategy") or "").title(),
         "score": score(row),
         "status": status(row),
-        "details": "Details" if row.get("status", "completed") == "completed" else "—",
-        "snapshot_id": row.get("id", ""),
+        "details": (
+            ui.Button(
+                "Details", variant="ghost", size="sm",
+                on_click=ui.Call("__panel__psi", view="snapshot", snapshot_id=row.get("id", "")),
+            )
+            if status(row) == "Completed" and row.get("id") else "—"
+        ),
     } for row in rows]
 
-    detail_actions = [
-        ui.Button(
-            f"Details — {row['url']}", icon="ChartNoAxesCombined", variant="secondary", size="sm",
-            on_click=ui.Call("__panel__psi", view="snapshot", snapshot_id=row["snapshot_id"]),
-        )
-        for row in table_rows if row["status"] == "Completed" and row["snapshot_id"]
-    ]
-    children: list[ui.UINode] = [
-        ui.Header(text="Speed check runs", level=2,
-                  subtitle="Every check is tracked here from Running to Completed."),
+    return ui.Stack(direction="v", gap=3, children=[
+        ui.Header(text="Speed check runs", level=2),
         ui.DataTable(
             columns=[
                 ui.DataColumn("url", "Site", width="30%"),
@@ -342,10 +257,4 @@ async def psi_panel(ctx, **kwargs) -> ui.UINode:
             ],
             rows=table_rows,
         ),
-    ]
-    if detail_actions:
-        children.extend([
-            ui.Header(text="Open a completed analysis", level=3),
-            ui.Stack(direction="h", gap=2, wrap=True, children=detail_actions),
-        ])
-    return ui.Stack(direction="v", gap=3, children=children)
+    ])
