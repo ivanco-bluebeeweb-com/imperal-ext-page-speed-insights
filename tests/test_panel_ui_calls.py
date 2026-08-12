@@ -174,10 +174,20 @@ async def test_center_panel_renders_run_table_statuses_and_details_action():
     assert "Desktop" in dumped and "Mobile" in dumped
     assert "90/100" in dumped
     assert "Running" in dumped and "Completed" in dumped
-    assert "View details" in dumped
+    assert "Details" in dumped
     assert "[object Object]" not in dumped
     assert completed_id in dumped
     assert "view': 'snapshot'" in dumped
+
+    # The colored status pill (Badge) must still be there -- only the
+    # second, plain-text status mention was replaced by a Details button.
+    list_node = node.props["children"][1]
+    for item in list_node.props["items"]:
+        badge_stack = item.props.get("badge")
+        assert badge_stack is not None and badge_stack.type == "Stack"
+        kinds = [child.type for child in badge_stack.props["children"]]
+        assert "Badge" in kinds
+        assert "Button" in kinds
 
 
 @pytest.mark.asyncio

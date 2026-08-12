@@ -229,6 +229,23 @@ async def psi_panel(ctx, **kwargs) -> ui.UINode:
         raw = str(row.get("status") or "completed").lower()
         return {"running": "Running", "completed": "Completed", "failed": "Failed"}.get(raw, raw.title())
 
+    def status_and_details(row: dict) -> ui.UINode:
+        """Colored status pill unchanged; the second, plain status mention
+        (the one that used to sit as gray meta text and swap to a hover-only
+        icon) is now an explicit, always-visible Details button instead."""
+        label = status(row)
+        pill = ui.Badge(
+            label=label,
+            color={"Completed": "green", "Running": "blue", "Failed": "red"}.get(label, "gray"),
+        )
+        children = [pill]
+        if row.get("id"):
+            children.append(ui.Button(
+                "Details", variant="outline", size="sm",
+                on_click=ui.Call("__panel__psi", view="snapshot", snapshot_id=str(row["id"])),
+            ))
+        return ui.Stack(direction="h", gap=2, align="center", children=children)
+
     list_items = [
         ui.ListItem(
             id=str(row.get("id") or f"run-{index}"),
@@ -238,21 +255,9 @@ async def psi_panel(ctx, **kwargs) -> ui.UINode:
                 f"{str(row.get('strategy') or 'unknown').title()} · "
                 f"Performance {score(row)}"
             ),
-            meta=status(row),
-            badge=ui.Badge(
-                label=status(row),
-                color={"Completed": "green", "Running": "blue", "Failed": "red"}.get(status(row), "gray"),
-            ),
+            badge=status_and_details(row),
             on_click=(
                 ui.Call("__panel__psi", view="snapshot", snapshot_id=str(row["id"]))
-                if row.get("id") else None
-            ),
-            actions=(
-                [{
-                    "icon": "ChartNoAxesCombined",
-                    "label": "View details",
-                    "on_click": ui.Call("__panel__psi", view="snapshot", snapshot_id=str(row["id"])),
-                }]
                 if row.get("id") else None
             ),
         )
