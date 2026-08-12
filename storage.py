@@ -15,6 +15,11 @@ from datetime import datetime, timezone
 SNAPSHOTS_COLLECTION = "speed_snapshots"
 SETTINGS_COLLECTION = "settings"
 SETTINGS_DOC_ID = "default"
+RUNNING_TIMEOUT_SECONDS = 30 * 60
+STALE_RUN_ERROR = (
+    "The PageSpeed check did not finish within 30 minutes. "
+    "It was marked failed automatically."
+)
 
 
 def now_iso() -> str:
@@ -48,8 +53,49 @@ async def update_run(ctx, run_id: str, patch: dict) -> dict:
     return entity.data | {"id": entity.id}
 
 
+def _parse_iso_timestamp(value: str) -> datetime | None:
+    """Parse our stored ISO timestamp without treating malformed data as stale."""
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except (TypeError, ValueError):
+        return None
+
+
+async def reconcile_stale_running_runs(ctx, rows: list[dict]) -> list[dict]:
+    """Mark only demonstrably abandoned ``running`` rows as failed.
+
+    A PageSpeed run normally completes in minutes. If the worker/process dies
+    after persisting its initial row, no completion handler remains to update
+    it. This reconciliation runs when history is read and changes only rows
+    that are still ``running`` and whose `started_at` is older than the
+    explicit 30-minute timeout. Unknown/malformed timestamps stay untouched.
+    """
+    cutoff = datetime.now(timezone.utc).timestamp() - RUNNING_TIMEOUT_SECONDS
+    reconciled: list[dict] = []
+    for row in rows:
+        started_at = _parse_iso_timestamp(row.get("started_at") or row.get("checked_at") or "")
+        is_stale = (
+            str(row.get("status") or "").lower() == "running"
+            and started_at is not None
+            and started_at.timestamp() < cutoff
+        )
+        if not is_stale:
+            reconciled.append(row)
+            continue
+        failed_at = now_iso()
+        patch = {
+            "status": "failed",
+            "checked_at": failed_at,
+            "completed_at": failed_at,
+            "error": STALE_RUN_ERROR,
+        }
+        await update_run(ctx, str(row["id"]), patch)
+        reconciled.append(row | patch)
+    return reconciled
+
+
 async def list_snapshots(ctx, *, url: str = "", strategy: str = "", limit: int = 20) -> list[dict]:
-    """Return runs newest first, without relying on server-side ordering.
+    """Return runs newest first and reconcile only abandoned running rows.
 
     PageSpeed checks can be written successfully while a server-side
     ``order_by`` query is rejected by the store. Fetching the collection and
@@ -58,6 +104,7 @@ async def list_snapshots(ctx, *, url: str = "", strategy: str = "", limit: int =
     """
     page = await ctx.store.query(SNAPSHOTS_COLLECTION, limit=200)
     rows = [doc.data | {"id": doc.id} for doc in page.data]
+    rows = await reconcile_stale_running_runs(ctx, rows)
     if url:
         norm = url.lower().strip()
         rows = [r for r in rows if norm in (r.get("url") or "").lower()]

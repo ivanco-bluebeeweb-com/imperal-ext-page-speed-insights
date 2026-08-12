@@ -23,6 +23,7 @@ import ast
 import inspect
 import pathlib
 import re
+from datetime import datetime, timezone
 
 import pytest
 
@@ -157,9 +158,10 @@ async def test_center_panel_renders_run_table_statuses_and_details_action():
         "checked_at": "2026-08-11T17:00:00Z", "status": "completed",
         "scores": {"performance": 0.90},
     })
+    started_at = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
     await st.save_snapshot(ctx, {
         "url": "https://cleantech.md", "strategy": "mobile",
-        "checked_at": "2026-08-11T17:01:00Z", "status": "running",
+        "started_at": started_at, "checked_at": started_at, "status": "running",
         "scores": {},
     })
 

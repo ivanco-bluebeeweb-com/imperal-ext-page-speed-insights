@@ -4,6 +4,7 @@ history/comparison, every App settings save/read handler, and the IPC
 surface other extensions call (check_site_speed_ipc + ping).
 """
 import sys
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -117,6 +118,48 @@ async def test_list_snapshots_sorts_locally_without_server_order_by(monkeypatch)
 
     assert [row["url"] for row in rows] == ["https://newer.example", "https://older.example"]
     assert calls and calls[0]["order_by"] is None
+
+
+@pytest.mark.asyncio
+async def test_list_snapshots_marks_only_expired_running_runs_failed():
+    """An abandoned background worker must not leave an infinite Running row."""
+    import storage as st
+
+    ctx = _ctx()
+    old_started = (datetime.now(timezone.utc) - timedelta(minutes=31)).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    stale_id = await st.create_run(ctx, {
+        "url": "https://stale.example", "strategy": "mobile", "status": "running",
+        "started_at": old_started, "checked_at": old_started,
+    })
+
+    rows = await st.list_snapshots(ctx)
+    stale = next(row for row in rows if row["id"] == stale_id)
+    assert stale["status"] == "failed"
+    assert stale["error"] == st.STALE_RUN_ERROR
+    persisted = await st.get_snapshot(ctx, stale_id)
+    assert persisted and persisted["status"] == "failed"
+
+
+@pytest.mark.asyncio
+async def test_list_snapshots_keeps_fresh_and_undated_running_runs_unchanged():
+    """Do not label a live or unprovable run as failed."""
+    import storage as st
+
+    ctx = _ctx()
+    fresh_started = (datetime.now(timezone.utc) - timedelta(minutes=2)).strftime("%Y-%m-%dT%H:%M:%S.%fZ")
+    fresh_id = await st.create_run(ctx, {
+        "url": "https://fresh.example", "strategy": "mobile", "status": "running",
+        "started_at": fresh_started, "checked_at": fresh_started,
+    })
+    unknown_id = await st.create_run(ctx, {
+        "url": "https://unknown.example", "strategy": "mobile", "status": "running",
+        "started_at": "not-a-date", "checked_at": "not-a-date",
+    })
+
+    rows = await st.list_snapshots(ctx)
+    statuses = {row["id"]: row["status"] for row in rows}
+    assert statuses[fresh_id] == "running"
+    assert statuses[unknown_id] == "running"
 
 
 # ─────────────────────────── connect / disconnect ───────────────────────────
