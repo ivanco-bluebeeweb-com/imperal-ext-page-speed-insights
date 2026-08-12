@@ -236,23 +236,16 @@ async def psi_panel(ctx, **kwargs) -> ui.UINode:
             subtitle=(
                 f"{row.get('checked_at') or 'Unknown time'} · "
                 f"{str(row.get('strategy') or 'unknown').title()} · "
-                f"Performance {score(row)}"
+                f"Performance {score(row)} · {status(row)}"
             ),
-            meta=status(row),
-            badge=ui.Badge(
-                label=status(row),
-                color={"Completed": "green", "Running": "blue", "Failed": "red"}.get(status(row), "gray"),
-            ),
-            on_click=(
-                ui.Call("__panel__psi", view="snapshot", snapshot_id=str(row["id"]))
-                if row.get("id") else None
-            ),
-            actions=(
-                [{
-                    "icon": "ChartNoAxesCombined",
-                    "label": "View details",
-                    "on_click": ui.Call("__panel__psi", view="snapshot", snapshot_id=str(row["id"])),
-                }]
+            # The row itself is not a link -- only the explicit "Details"
+            # button (placed where the Failed/Completed status text used
+            # to sit) navigates to the snapshot detail view.
+            badge=(
+                ui.Button(
+                    "Details", variant="outline", size="sm",
+                    on_click=ui.Call("__panel__psi", view="snapshot", snapshot_id=str(row["id"])),
+                )
                 if row.get("id") else None
             ),
         )

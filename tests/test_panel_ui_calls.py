@@ -174,10 +174,23 @@ async def test_center_panel_renders_run_table_statuses_and_details_action():
     assert "Desktop" in dumped and "Mobile" in dumped
     assert "90/100" in dumped
     assert "Running" in dumped and "Completed" in dumped
-    assert "View details" in dumped
+    assert "Details" in dumped
     assert "[object Object]" not in dumped
     assert completed_id in dumped
     assert "view': 'snapshot'" in dumped
+
+    # The row itself must not be a link -- only the Details button/badge
+    # slot carries on_click. Status text sits in the subtitle, not as a
+    # separate label where "Details" now lives.
+    list_node = node.props["children"][1]
+    for item in list_node.props["items"]:
+        assert "on_click" not in item.props
+        assert "actions" not in item.props
+        assert "meta" not in item.props
+        badge = item.props.get("badge")
+        if badge is not None:
+            assert badge.type == "Button"
+            assert badge.props["label"] == "Details"
 
 
 @pytest.mark.asyncio
