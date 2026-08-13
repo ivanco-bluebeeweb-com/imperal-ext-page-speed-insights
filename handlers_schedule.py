@@ -15,7 +15,7 @@ from imperal_sdk import ActionResult
 import psi_client as psi
 import storage as st
 from app import ext
-from core import run_and_save
+from core import fetch_connected_sites, run_and_save
 from models import DEFAULT_THRESHOLDS
 
 TICK_CRON = "10 * * * *"
@@ -55,6 +55,25 @@ async def _sites_to_check(ctx, schedule: dict) -> list[str]:
     несуществующего источника.
     """
     return list(schedule.get("sites") or [])
+
+
+@ext.schedule("psi_connected_sites_refresh", TICK_CRON)
+async def psi_connected_sites_refresh(ctx) -> None:
+    """Keeps the sidebar's connected-sites cache warm with NO button and NO
+    chat message -- the whole point of this tick.
+
+    WHY A SEPARATE SCHEDULE INSTEAD OF A BUTTON. `ctx.extensions.call` made
+    from inside a *panel render* has been observed to reach the target
+    extension with an empty user context (kernel-side gap, see
+    storage.py's cache comment) -- so the sidebar can never refresh itself
+    live. A real `@ext.schedule` tick is, like `list_connected_sites`
+    itself, a normal call path with a populated context, so it is the
+    correct place to do this automatically instead of asking a human to
+    click Refresh every time a site gets connected or disconnected
+    elsewhere.
+    """
+    sites, problems = await fetch_connected_sites(ctx)
+    await st.cache_connected_sites(ctx, sites, problems)
 
 
 @ext.schedule("psi_auto_check", TICK_CRON)

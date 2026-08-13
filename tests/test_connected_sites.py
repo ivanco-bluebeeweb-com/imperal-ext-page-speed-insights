@@ -168,6 +168,62 @@ async def test_nav_panel_renders_divider_and_site_list_after_start_check():
     assert "climtec.md" in rendered
 
 
+def test_connected_sites_show_bare_domain_and_provider_display_name_no_refresh_button():
+    """Per explicit product decision: a connected site is shown as a bare
+    domain (no https://) with the SOURCE APP's Marketplace display_name
+    underneath, and there must be NO Refresh button anywhere -- the cache is
+    kept warm automatically by the psi_connected_sites_refresh schedule."""
+    from panels import _connected_sites_block
+
+    sites = [{"site_id": "climtec.md", "url": "https://climtec.md",
+              "status": "connected", "provider": "wordpress-hub"}]
+    node = panels._connected_sites_block(sites, [], True, "")
+    rendered = repr(node)
+    assert "https://" not in rendered
+    assert "climtec.md" in rendered
+    assert "WordPress Hub" in rendered
+    assert "Refresh" not in rendered
+    assert "RefreshCw" not in rendered
+
+
+def test_no_refresh_button_anywhere_in_connected_sites_states():
+    """Every branch of _connected_sites_block (not-loaded / empty / with
+    problems / populated) must be button-free -- the whole point of making
+    this automatic."""
+    from panels import _connected_sites_block
+
+    # not loaded yet
+    assert "Refresh" not in repr(panels._connected_sites_block([], [], False, ""))
+    # no sites, no problems
+    assert "Refresh" not in repr(panels._connected_sites_block([], [], True, ""))
+    # provider unreachable
+    problems = [{"provider": "wordpress-hub", "reason": "boom"}]
+    assert "Refresh" not in repr(panels._connected_sites_block([], problems, True, ""))
+
+
+@pytest.mark.asyncio
+async def test_psi_connected_sites_refresh_schedule_populates_cache_automatically():
+    """The whole point of this tick: no chat call, no button click -- just
+    the schedule waking up and warming the cache that the sidebar reads."""
+    import handlers_schedule as hs
+
+    ctx = _ctx()
+    ctx.extensions.register(
+        "wordpress-hub", "list_connected_sites",
+        lambda: [{"site_id": "wp-1", "url": "https://climtec.md", "status": "connected"}],
+    )
+    ctx.extensions.register("sites-registry", "list_connected_sites", lambda: [])
+
+    sites, problems, has_cache = await st.read_cached_connected_sites(ctx)
+    assert has_cache is False
+
+    await hs.psi_connected_sites_refresh(ctx)
+
+    sites, problems, has_cache = await st.read_cached_connected_sites(ctx)
+    assert has_cache is True
+    assert sites and sites[0]["site_id"] == "climtec.md"
+
+
 # ───────────────────────────────── site_view (center) ───────────────────────
 
 @pytest.mark.asyncio

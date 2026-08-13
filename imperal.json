@@ -2456,6 +2456,10 @@
     {
       "name": "psi_auto_check",
       "cron": "10 * * * *"
+    },
+    {
+      "name": "psi_connected_sites_refresh",
+      "cron": "10 * * * *"
     }
   ],
   "required_scopes": [],

@@ -37,7 +37,7 @@ from imperal_sdk import ui
 
 from app import ext
 import storage as st
-from core import get_api_key
+from core import get_api_key, provider_display_name
 from models import STRATEGIES
 from panels_views import compare_view, settings_view, site_view, snapshot_view
 
@@ -46,27 +46,29 @@ def _score_pct(v: float) -> str:
     return f"{round(v * 100)}"
 
 
+def _bare_domain(url: str) -> str:
+    """Strip a leading scheme (https://, http://) for display -- the sidebar
+    shows the domain a human recognises, not the URL a browser needs."""
+    return (url or "").strip().split("://", 1)[-1].rstrip("/") or url
+
+
 def _connected_sites_block(sites: list[dict], problems: list[dict], has_cache: bool,
                             active_site_id: str) -> ui.UINode:
     """Clickable list of sites already connected elsewhere (WordPress Hub /
     Sites Registry) -- one click routes the center panel to that site's own
     Speed Checker (view="site"). ALWAYS returns something, never None: if
     there is nothing to show yet, it says why (not loaded / none connected /
-    provider unreachable) with a Refresh button that runs the real read
-    (list_connected_sites) instead of silently hiding the whole block."""
-    refresh = ui.Button(
-        "Refresh", variant="secondary", size="sm", icon="RefreshCw",
-        on_click=ui.Call("list_connected_sites"),
-    )
-
+    provider unreachable). The cache behind this is kept warm automatically
+    by the psi_connected_sites_refresh schedule tick -- no Refresh button:
+    a live ctx.extensions.call from inside a panel render is unreliable
+    (see storage.py), so a manual retry button would just be a coin flip."""
     if not has_cache and not sites and not problems:
         return ui.Stack(direction="v", gap=2, children=[
             ui.Text(
-                "Not loaded yet -- click Refresh to pull sites already "
-                "connected in WordPress Hub or Sites Registry.",
+                "Not loaded yet -- sites connected in WordPress Hub or "
+                "Sites Registry appear here automatically within the hour.",
                 variant="caption",
             ),
-            refresh,
         ])
 
     if not sites:
@@ -77,20 +79,19 @@ def _connected_sites_block(sites: list[dict], problems: list[dict], has_cache: b
         )
         return ui.Stack(direction="v", gap=2, children=[
             ui.Empty(message=message),
-            refresh,
         ])
 
     items = [
         ui.ListItem(
             id=s["site_id"],
-            title=s["url"] or s["site_id"],
-            subtitle=s.get("provider", ""),
+            title=_bare_domain(s["url"] or s["site_id"]),
+            subtitle=provider_display_name(s.get("provider", "")),
             selected=(active_site_id == s["site_id"]),
             on_click=ui.Call("__panel__psi", view="site", site_id=s["site_id"]),
         )
         for s in sites
     ]
-    return ui.Stack(direction="v", gap=2, children=[ui.List(items=items), refresh])
+    return ui.Stack(direction="v", gap=2, children=[ui.List(items=items)])
 
 
 def _connect_card() -> ui.UINode:

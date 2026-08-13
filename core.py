@@ -20,6 +20,19 @@ from shared import categorize
 # somehow reported by both -- the first provider's row wins.
 SITE_PROVIDER_APP_IDS: list[str] = ["wordpress-hub", "sites-registry"]
 
+# Marketplace display_name for each provider app_id -- shown under a site's
+# bare domain in the sidebar so it's clear WHERE that connected site comes
+# from, using the same name the user sees when browsing the Marketplace
+# (confirmed via marketplace.list_my_installed), not the raw app_id slug.
+PROVIDER_DISPLAY_NAMES: dict[str, str] = {
+    "wordpress-hub": "WordPress Hub",
+    "sites-registry": "Sites Registry",
+}
+
+
+def provider_display_name(app_id: str) -> str:
+    return PROVIDER_DISPLAY_NAMES.get(app_id, app_id)
+
 
 def _canonical_site_id(row: dict) -> str:
     """Normalise a provider's site identifier to its bare domain, the same
