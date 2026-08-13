@@ -17,15 +17,15 @@ import storage as st
 from app import chat
 from core import (
     begin_speed_run, build_settings_state, complete_speed_run, doc_to_snapshot,
-    normalize_url, run_and_save,
+    fetch_connected_sites, normalize_url, run_and_save,
 )
 from models import (
     CheckSiteSpeedParams, CompareSnapshotsParams, ComparisonResult,
-    ConnectPagespeedParams, GetScheduleParams, GetSnapshotParams,
-    ListSnapshotsParams, NoParams, SaveCategoryTogglesParams,
-    SaveNotifyModeParams, SaveRetentionParams, SaveScheduleParams,
-    SaveThresholdsParams, SettingsState, SnapshotList, SnapshotSummary,
-    SpeedSnapshot,
+    ConnectedSite, ConnectedSiteList, ConnectPagespeedParams, GetScheduleParams,
+    GetSnapshotParams, ListConnectedSitesParams, ListSnapshotsParams, NoParams,
+    SaveCategoryTogglesParams, SaveNotifyModeParams, SaveRetentionParams,
+    SaveScheduleParams, SaveThresholdsParams, SettingsState, SnapshotList,
+    SnapshotSummary, SpeedSnapshot,
 )
 from shared import error as _error
 
@@ -362,3 +362,44 @@ async def get_speed_settings(ctx, params: GetScheduleParams) -> ActionResult:
     default categories, retention, notify mode, schedule."""
     state = await build_settings_state(ctx)
     return ActionResult.success(data=state, summary="Settings loaded.")
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Обнаружение уже подключённых сайтов (WordPress Hub / Sites Registry)
+# ──────────────────────────────────────────────────────────────────────────
+
+@chat.function(
+    "list_connected_sites",
+    description=(
+        "List the sites already connected in other apps (WordPress Hub and/or "
+        "Sites Registry) so a speed check can target one with a single click "
+        "instead of retyping its domain."
+    ),
+    action_type="read",
+    chain_callable=True,
+    data_model=ConnectedSiteList,
+)
+async def list_connected_sites(ctx, params: ListConnectedSitesParams) -> ActionResult:
+    """Real IPC read (not a panel render) -- reaches WordPress Hub/Sites
+    Registry with a normally-populated user context, then caches the result
+    so the sidebar can show it even from a panel render where that same
+    IPC call has been observed to fail (see storage.cache_connected_sites)."""
+    sites, problems = await fetch_connected_sites(ctx)
+    await st.cache_connected_sites(ctx, sites, problems)
+    items = [
+        ConnectedSite(id=s["site_id"], title=s["url"] or s["site_id"],
+                      site_id=s["site_id"], url=s["url"], status=s["status"],
+                      provider=s["provider"])
+        for s in sites[: params.limit]
+    ]
+    if not items and problems:
+        return _error(
+            f"Could not reach any site provider ({', '.join(p['provider'] for p in problems)}). "
+            "Try again in a moment.",
+            c.PSI_PROVIDER_ERROR,
+        )
+    return ActionResult.success(
+        data=ConnectedSiteList(items=items, total=len(items)),
+        summary=f"{len(items)} connected site(s).",
+        refresh_panels=["psi_nav"],
+    )

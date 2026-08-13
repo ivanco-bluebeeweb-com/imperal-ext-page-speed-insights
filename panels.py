@@ -39,11 +39,58 @@ from app import ext
 import storage as st
 from core import get_api_key
 from models import STRATEGIES
-from panels_views import compare_view, settings_view, snapshot_view
+from panels_views import compare_view, settings_view, site_view, snapshot_view
 
 
 def _score_pct(v: float) -> str:
     return f"{round(v * 100)}"
+
+
+def _connected_sites_block(sites: list[dict], problems: list[dict], has_cache: bool,
+                            active_site_id: str) -> ui.UINode:
+    """Clickable list of sites already connected elsewhere (WordPress Hub /
+    Sites Registry) -- one click routes the center panel to that site's own
+    Speed Checker (view="site"). ALWAYS returns something, never None: if
+    there is nothing to show yet, it says why (not loaded / none connected /
+    provider unreachable) with a Refresh button that runs the real read
+    (list_connected_sites) instead of silently hiding the whole block."""
+    refresh = ui.Button(
+        "Refresh", variant="secondary", size="sm", icon="RefreshCw",
+        on_click=ui.Call("list_connected_sites"),
+    )
+
+    if not has_cache and not sites and not problems:
+        return ui.Stack(direction="v", gap=2, children=[
+            ui.Text(
+                "Not loaded yet -- click Refresh to pull sites already "
+                "connected in WordPress Hub or Sites Registry.",
+                variant="caption",
+            ),
+            refresh,
+        ])
+
+    if not sites:
+        message = (
+            f"Could not reach: {', '.join(p['provider'] for p in problems)}."
+            if problems else
+            "No connected sites found yet in WordPress Hub or Sites Registry."
+        )
+        return ui.Stack(direction="v", gap=2, children=[
+            ui.Empty(message=message),
+            refresh,
+        ])
+
+    items = [
+        ui.ListItem(
+            id=s["site_id"],
+            title=s["url"] or s["site_id"],
+            subtitle=s.get("provider", ""),
+            selected=(active_site_id == s["site_id"]),
+            on_click=ui.Call("__panel__psi", view="site", site_id=s["site_id"]),
+        )
+        for s in sites
+    ]
+    return ui.Stack(direction="v", gap=2, children=[ui.List(items=items), refresh])
 
 
 def _connect_card() -> ui.UINode:
@@ -153,6 +200,9 @@ async def psi_nav_panel(ctx, **kwargs) -> ui.UINode:
             ),
         ])
 
+    active_site_id = str(kwargs.get("site_id") or "").strip()
+    sites, problems, has_cache = await st.read_cached_connected_sites(ctx)
+
     return ui.Stack(direction="v", gap=3, children=[
         ui.Section(
             title="Start checking site speed",
@@ -174,6 +224,8 @@ async def psi_nav_panel(ctx, **kwargs) -> ui.UINode:
                 ),
             ],
         ),
+        ui.Divider(label="Connected sites"),
+        _connected_sites_block(sites, problems, has_cache, active_site_id),
         ui.Button(
             "Application Settings", icon="Settings", variant="secondary", full_width=True,
             on_click=ui.Call("__panel__psi", view="settings"),
@@ -202,6 +254,8 @@ async def psi_panel(ctx, **kwargs) -> ui.UINode:
         return await snapshot_view(ctx, str(kwargs.get("snapshot_id") or ""))
     if view == "compare":
         return await compare_view(ctx, str(kwargs.get("url") or ""), str(kwargs.get("strategy") or ""))
+    if view == "site":
+        return await site_view(ctx, str(kwargs.get("site_id") or ""))
 
     try:
         rows = await st.list_snapshots(ctx, limit=50)

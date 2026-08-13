@@ -286,3 +286,72 @@ async def settings_view(ctx) -> ui.UINode:
     children.append(ui.Button("Back", variant="ghost", on_click=ui.Call("__panel__psi")))
 
     return ui.Stack(direction="v", gap=4, children=children)
+
+
+async def site_view(ctx, site_id: str) -> ui.UINode:
+    """Speed Checker scoped to ONE connected site: a check form pre-filled
+    with that site's own URL, plus its own run history only -- not every
+    run for every site, per the explicit request that clicking a sidebar
+    site must show the checker for THAT site alone."""
+    if not site_id:
+        return ui.Stack(direction="v", gap=3, children=[
+            ui.Alert(title="No site selected", message="Pick a site from the left sidebar.", type="error"),
+            ui.Button("Back", variant="ghost", on_click=ui.Call("__panel__psi")),
+        ])
+
+    children: list[ui.UINode] = [
+        ui.Button("Back to Page Speed Runs List", variant="ghost", icon="ArrowLeft",
+                  on_click=ui.Call("__panel__psi")),
+        ui.Header(text=f"Speed Checker -- {_site_name(site_id)}", level=2,
+                  subtitle=site_id),
+        ui.Form(
+            action="check_site_speed",
+            submit_label="Start check",
+            defaults={"url": site_id},
+            children=[
+                ui.Input(param_name="url", placeholder="Site, e.g. cleantech.md", value=site_id),
+                ui.Select(
+                    param_name="strategy",
+                    value="mobile",
+                    options=[
+                        {"value": "mobile", "label": "Mobile"},
+                        {"value": "desktop", "label": "Desktop"},
+                    ],
+                ),
+            ],
+        ),
+    ]
+
+    try:
+        rows = await st.list_snapshots(ctx, url=site_id, limit=50)
+    except Exception:
+        rows = None
+
+    if rows is None:
+        children.append(ui.Alert(
+            title="Run history could not load",
+            message="The saved-run service is temporarily unavailable. You can still start a new check above.",
+            type="error",
+        ))
+    elif not rows:
+        children.append(ui.Empty(message=f"No speed checks yet for {site_id} -- run one above."))
+    else:
+        def score(row: dict) -> str:
+            performance = (row.get("scores") or {}).get("performance")
+            return f"{round(performance * 100)}/100" if performance is not None else "—"
+
+        list_items = [
+            ui.ListItem(
+                id=str(row.get("id") or f"run-{index}"),
+                title=str(row.get("checked_at") or "Unknown time"),
+                subtitle=f"{str(row.get('strategy') or 'unknown').title()} · Performance {score(row)}",
+                on_click=(
+                    ui.Call("__panel__psi", view="snapshot", snapshot_id=str(row["id"]))
+                    if row.get("id") else None
+                ),
+            )
+            for index, row in enumerate(rows, start=1)
+        ]
+        children.append(ui.Section(title="Run history for this site", children=[ui.List(items=list_items)]))
+
+    return ui.Stack(direction="v", gap=3, children=children)

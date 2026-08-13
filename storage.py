@@ -178,3 +178,45 @@ async def save_settings(ctx, patch: dict) -> dict:
     except Exception:
         await ctx.store.create(SETTINGS_COLLECTION, {"id": SETTINGS_DOC_ID, **merged})
     return merged
+
+
+# --------------------- discovered sites cache ---------------------
+#
+# Same reasoning as content-strategy-app's _cache_connected_sites: a real
+# chat/tool call to fetch_connected_sites reaches WordPress Hub/Sites
+# Registry with a normal, populated user context, while the SAME
+# ctx.extensions.call made from inside a *panel render* has been observed to
+# reach it with an empty user context (kernel-side gap, not fixable from an
+# extension's own code). Caching what the working call path already proved
+# lets the sidebar show real data without depending on the panel-render call
+# path at all.
+
+CONNECTED_SITES_CACHE_COLLECTION = "connected_sites_cache"
+CONNECTED_SITES_CACHE_MARKER = "connected_sites"  # value of the "kind" field
+
+
+async def cache_connected_sites(ctx, sites: list[dict], problems: list[dict]) -> None:
+    """Persist the last-known-good discovered site list. Looked up by a
+    "kind" marker via query(where=...), NOT a fixed doc id: store.create
+    always server-assigns its own id, so a fixed-id get() would never find
+    what create() actually wrote."""
+    payload = {"kind": CONNECTED_SITES_CACHE_MARKER, "sites": sites, "problems": problems,
+               "cached_at": now_iso()}
+    page = await ctx.store.query(
+        CONNECTED_SITES_CACHE_COLLECTION, where={"kind": CONNECTED_SITES_CACHE_MARKER}, limit=1)
+    if page.data:
+        await ctx.store.update(CONNECTED_SITES_CACHE_COLLECTION, page.data[0].id, payload)
+    else:
+        await ctx.store.create(CONNECTED_SITES_CACHE_COLLECTION, payload)
+
+
+async def read_cached_connected_sites(ctx) -> tuple[list[dict], list[dict], bool]:
+    """Returns (sites, problems, has_cache). has_cache=False means no
+    real call has ever succeeded/failed and been cached yet -- distinct from
+    "cached, but empty" (has_cache=True, sites=[])."""
+    page = await ctx.store.query(
+        CONNECTED_SITES_CACHE_COLLECTION, where={"kind": CONNECTED_SITES_CACHE_MARKER}, limit=1)
+    if not page.data:
+        return [], [], False
+    data = page.data[0].data
+    return list(data.get("sites") or []), list(data.get("problems") or []), True

@@ -102,6 +102,26 @@ class NoParams(BaseModel):
     pass
 
 
+class ConnectedSite(sdl.Entity):
+    """One site read from a site-provider extension (WordPress Hub and/or
+    Sites Registry) -- the raw material behind the sidebar's clickable site
+    list. Same shape as content-strategy-app/brand-strategy-hub's own
+    ConnectedSite, so every app that discovers sites this way agrees on one
+    contract."""
+    site_id: str = ""
+    url: str = ""
+    status: str = ""
+    provider: str = ""
+
+
+class ConnectedSiteList(sdl.EntityList[ConnectedSite]):
+    pass
+
+
+class ListConnectedSitesParams(BaseModel):
+    limit: int = Field(50, description="Max items to return (1-100)")
+
+
 class SaveThresholdsParams(BaseModel):
     lcp_good_ms: int = Field(2500, description="LCP good threshold (ms)", ge=1)
     lcp_poor_ms: int = Field(4000, description="LCP poor threshold (ms)", ge=1)

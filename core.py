@@ -11,6 +11,60 @@ from models import (
 )
 from shared import categorize
 
+# Registry of app_ids that expose a "list_connected_sites" IPC method
+# returning [{"site_id", "name"/"url", "status"}, ...]. Both WordPress Hub
+# (a real WordPress connector) and Sites Registry (the platform-agnostic
+# catalogue -- covers non-WordPress sites too) are queried, per explicit
+# product decision: the sidebar must discover sites from EITHER source, not
+# just one. Order matters only as a tie-breaker when the same domain is
+# somehow reported by both -- the first provider's row wins.
+SITE_PROVIDER_APP_IDS: list[str] = ["wordpress-hub", "sites-registry"]
+
+
+def _canonical_site_id(row: dict) -> str:
+    """Normalise a provider's site identifier to its bare domain, the same
+    scheme content-strategy-app/brand-strategy-hub already use -- so a site
+    connected in WordPress Hub and also registered in Sites Registry is
+    recognised as ONE site, not shown twice."""
+    host = (row.get("url") or "").strip().split("://", 1)[-1].split("/", 1)[0].lower()
+    if host.startswith("www."):
+        host = host[4:]
+    return host or (row.get("site_id") or "")
+
+
+async def fetch_connected_sites(ctx) -> tuple[list[dict], list[dict]]:
+    """Pull every connected site from WordPress Hub and Sites Registry via
+    ctx.extensions.call -- direct in-process IPC, no chat round-trip.
+
+    Returns (sites, problems). A provider that fails is reported in
+    `problems` as {"provider", "reason"} instead of silently vanishing.
+    Sites are de-duplicated by canonical domain across providers.
+    """
+    sites: list[dict] = []
+    seen_ids: set[str] = set()
+    problems: list[dict] = []
+    for app_id in SITE_PROVIDER_APP_IDS:
+        try:
+            rows = await ctx.extensions.call(app_id, "list_connected_sites")
+        except Exception as exc:  # noqa: BLE001 -- surfaced to the panel, not swallowed
+            problems.append({
+                "provider": app_id,
+                "reason": f"{type(exc).__name__}: {exc}".strip()[:300],
+            })
+            continue
+        for r in rows or []:
+            canonical = _canonical_site_id(r)
+            if not canonical or canonical in seen_ids:
+                continue
+            seen_ids.add(canonical)
+            sites.append({
+                "site_id": canonical,
+                "url": r.get("url", "") or canonical,
+                "status": r.get("status", ""),
+                "provider": app_id,
+            })
+    return sites, problems
+
 
 def normalize_url(url: str) -> str:
     """Normalize a bare domain to HTTPS while keeping a full URL unchanged."""
