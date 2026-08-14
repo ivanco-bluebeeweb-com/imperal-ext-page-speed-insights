@@ -1,6 +1,6 @@
 {
   "manifest_schema_version": 3,
-  "sdk_version": "5.9.13",
+  "sdk_version": "5.9.19",
   "app_id": "page-speed-insights",
   "version": "0.1.0",
   "name": "Page Speed Insights",
@@ -2449,16 +2449,165 @@
       "long_running": false,
       "scopes": [],
       "owner_chat_tool": "page-speed-insights"
+    },
+    {
+      "name": "list_connected_sites",
+      "description": "List the sites already connected in other apps (WordPress Hub and/or Sites Registry) so a speed check can target one with a single click instead of retyping its domain.",
+      "action_type": "read",
+      "chain_callable": true,
+      "effects": [],
+      "id_projection": "",
+      "params_schema": {
+        "properties": {
+          "limit": {
+            "default": 50,
+            "description": "Max items to return (1-100)",
+            "title": "Limit",
+            "type": "integer"
+          }
+        },
+        "title": "ListConnectedSitesParams",
+        "type": "object"
+      },
+      "return_schema": {
+        "$defs": {
+          "ConnectedSite": {
+            "description": "One site read from a site-provider extension (WordPress Hub and/or\nSites Registry) -- the raw material behind the sidebar's clickable site\nlist. Same shape as content-strategy-app/brand-strategy-hub's own\nConnectedSite, so every app that discovers sites this way agrees on one\ncontract.",
+            "properties": {
+              "id": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "integer"
+                  }
+                ],
+                "title": "Id"
+              },
+              "title": {
+                "title": "Title",
+                "type": "string"
+              },
+              "kind": {
+                "default": "",
+                "title": "Kind",
+                "type": "string"
+              },
+              "subtitle": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Subtitle"
+              },
+              "description": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Description"
+              },
+              "status": {
+                "default": "",
+                "title": "Status",
+                "type": "string"
+              },
+              "url": {
+                "default": "",
+                "title": "Url",
+                "type": "string"
+              },
+              "site_id": {
+                "default": "",
+                "title": "Site Id",
+                "type": "string"
+              },
+              "provider": {
+                "default": "",
+                "title": "Provider",
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "title"
+            ],
+            "title": "ConnectedSite",
+            "type": "object",
+            "x-sdl": "entity"
+          }
+        },
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/$defs/ConnectedSite"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Total"
+          },
+          "page": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Page"
+          },
+          "has_more": {
+            "default": false,
+            "title": "Has More",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "ConnectedSiteList",
+        "type": "object",
+        "x-sdl": "entity-list"
+      },
+      "event": "",
+      "background": false,
+      "long_running": false,
+      "scopes": [],
+      "owner_chat_tool": "page-speed-insights"
     }
   ],
   "signals": [],
   "schedules": [
     {
-      "name": "psi_auto_check",
+      "name": "psi_connected_sites_refresh",
       "cron": "10 * * * *"
     },
     {
-      "name": "psi_connected_sites_refresh",
+      "name": "psi_auto_check",
       "cron": "10 * * * *"
     }
   ],
