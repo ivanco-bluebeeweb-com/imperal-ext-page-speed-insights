@@ -4,6 +4,20 @@
 
 ---
 
+## Прогон 2026-08-20 — Часть D (Deploy Verification / Idempotency / Security-SSRF / Regression grep)
+
+**D1 (Deploy Verification):** не применялось — код приложения не менялся (только тесты), деплой не требуется.
+
+**D2 (Idempotency):** добавлен 1 тест. `disconnect_pagespeed` безусловно удаляет сохранённый ключ — подтверждено, что второй вызов подряд (двойной клик) остаётся чистым успехом, не падает на уже отсутствующем ключе.
+
+**D3 (Security/SSRF):** подтверждено — поле `url` в `check_site_speed` является ДАННЫМИ, отправляемыми в Google PageSpeed Insights API как query-параметр (страница, которую проверит сама инфраструктура Google), а не адресом собственного fetch этого приложения. Все обращения в `psi_client.py` идут через фиксированную константу `BASE_URL` (`googleapis.com/pagespeedonline/v5`). Добавлен 1 regression-тест на эту константу.
+
+**D4 (Regression grep):** нет новых находок специфичных для этого приложения сверх `Docs/known-bug-patterns.md`.
+
+**Итог:** 64/64 тестов зелёные (было 56... plus already-existing 8 IPC gap-coverage tests from the 2026-08-19 run — full total now 64). Реальных багов не найдено.
+
+---
+
 ## Прогон 2026-08-19
 
 **Существующее покрытие до PST:** 56 тестов в 3 файлах. Аудит по точному

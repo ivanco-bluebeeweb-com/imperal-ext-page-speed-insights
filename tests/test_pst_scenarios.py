@@ -83,3 +83,30 @@ async def test_recovery_check_site_speed_ipc_retryable_flag_survives(ctx_with_ke
     out = await hipc.expose_check_site_speed(ctx_with_key, url="https://example.com")
     assert out["ok"] is False
     assert out["retryable"] is True
+
+
+# ── Part D2 (SCENARIO_TESTING_STANDARD.md): idempotency / double-invocation ─
+
+async def test_d2_double_disconnect_pagespeed_is_idempotent(ctx_with_key):
+    """disconnect_pagespeed unconditionally deletes the saved key -- calling
+    it twice in a row (double-click) must stay a clean success both times,
+    never error on a key that's already gone the second time."""
+    import handlers as h
+    from models import NoParams
+    first = await h.disconnect_pagespeed(ctx_with_key, NoParams())
+    assert first.error is None
+
+    second = await h.disconnect_pagespeed(ctx_with_key, NoParams())
+    assert second.error is None
+
+
+# ── Part D3 (SCENARIO_TESTING_STANDARD.md): security / SSRF surface -------
+
+async def test_d3_no_ssrf_all_checks_target_fixed_google_psi_host():
+    """check_site_speed's `url` field is DATA sent to Google's PageSpeed
+    Insights API as a query parameter (the page Google itself will check on
+    Google's own infrastructure) -- it is never used as this app's own
+    fetch target. Every outbound call in psi_client.py goes through the
+    fixed BASE_URL constant (Google's PSI v5 endpoint). Regression
+    trip-wire on that constant."""
+    assert psi.BASE_URL == "https://www.googleapis.com/pagespeedonline/v5/runPagespeed"
