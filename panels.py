@@ -196,8 +196,7 @@ async def psi_nav_panel(ctx, **kwargs) -> ui.UINode:
         # The actual key form lives in Application Settings after Add account.
         return ui.Stack(direction="v", gap=3, children=[
             ui.Button(
-                "Add account", icon="Plus", full_width=True,
-                on_click=ui.Call("__panel__psi", view="settings"),
+                "Add account", icon="Plus", on_click=ui.Call("__panel__psi", view="settings"),
             ),
         ])
 
@@ -228,8 +227,7 @@ async def psi_nav_panel(ctx, **kwargs) -> ui.UINode:
         ui.Divider(label="Connected sites"),
         _connected_sites_block(sites, problems, has_cache, active_site_id),
         ui.Button(
-            "Application Settings", icon="Settings", variant="secondary", full_width=True,
-            on_click=ui.Call("__panel__psi", view="settings"),
+            "Application Settings", icon="Settings", variant="secondary", on_click=ui.Call("__panel__psi", view="settings"),
         ),
     ])
 
